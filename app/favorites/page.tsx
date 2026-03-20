@@ -88,7 +88,9 @@ const FavoritesPage = () => {
                 return null;
               }
 
-              const isLive = match.status === "LIVE" || match.status === "HT";
+              const today = new Date().toDateString();
+              const matchDate = new Date(match.date).toDateString();
+              const isLive = (match.status === "LIVE" || match.status === "HT") && matchDate === today;
               const isFT = match.status === "FT";
               const isNS = match.status === "NS";
               const homeWin = isFT && (match.score.home ?? 0) > (match.score.away ?? 0);

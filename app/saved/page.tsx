@@ -100,7 +100,7 @@ export default function SavedMatchesPage() {
                       <div className={styles.matchLeague}>
                         {m.league.logo && <Image src={m.league.logo} alt="" width={14} height={14} onError={e=>{(e.target as HTMLImageElement).style.display="none"}}/>}
                         <span>{m.league.name}</span>
-                        <span className={`${styles.statusPill} ${m.status === "FT" ? styles.statusFT : m.status === "LIVE" ? styles.statusLive : styles.statusNS}`}>
+                        <span className={`${styles.statusPill} ${m.status === "FT" ? styles.statusFT : (m.status === "LIVE" && new Date(m.date).toDateString() === new Date().toDateString()) ? styles.statusLive : styles.statusNS}`}>
                           {STATUS_LABEL[m.status] ?? m.status}
                         </span>
                       </div>

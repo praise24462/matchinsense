@@ -92,8 +92,14 @@ const Logo = memo(function Logo({ src, size, fallback }: { src: string; size: nu
   return <Image src={src} alt="" width={size} height={size} style={{ objectFit: "contain", flexShrink: 0 }} onError={() => setErr(true)} />;
 });
 
+const isTodayLive = (match: Match): boolean => {
+  const today = new Date().toDateString();
+  const matchDate = new Date(match.date).toDateString();
+  return (match.status === "LIVE" || match.status === "HT") && matchDate === today;
+};
+
 const MatchRow = memo(function MatchRow({ match, isSaved, onSaveToggle }: { match: Match; isSaved: boolean; onSaveToggle: (matchId: number) => void }) {
-  const isLive = match.status === "LIVE" || match.status === "HT";
+  const isLive = isTodayLive(match);
   const isFT   = match.status === "FT";
   const isNS   = match.status === "NS";
   const homeWin = isFT && (match.score.home ?? 0) > (match.score.away ?? 0);
@@ -245,13 +251,13 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   }, [selectedDate, fetchError]);
 
   let display = matches;
-  if (liveOnly) display = display.filter(m => m.status === "LIVE" || m.status === "HT");
+  if (liveOnly) display = display.filter(m => isTodayLive(m));
   if (filterComp) {
     display = display.filter(m => String(m.league.id) === filterComp);
   }
 
   const groups = groupByLeague(display);
-  const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
+  const liveCount = matches.filter(m => isTodayLive(m)).length;
 
   // Progressive rendering — show 8 groups first, load more as user scrolls
   const INITIAL_GROUPS = 8;

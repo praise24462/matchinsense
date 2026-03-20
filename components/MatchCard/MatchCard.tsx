@@ -7,7 +7,9 @@ import styles from "./MatchCard.module.scss";
 export default function MatchCard({ match }: { match: Match }) {
   const { id, homeTeam, awayTeam, score, status, date, source } = match;
 
-  const isLive      = status === "LIVE";
+const today = new Date().toDateString();
+  const matchDate = new Date(date).toDateString();
+  const isLive      = status === "LIVE" && matchDate === today;
   const isHT        = status === "HT";
   const isFinished  = status === "FT";
   const isUpcoming  = status === "NS";
@@ -44,7 +46,7 @@ const toggleFavorite = (e: React.MouseEvent) => {
   return (
     <Link
       href={href}
-      className={`${styles.row} ${isLive || isHT ? styles.rowLive : ""}`}
+className={`${styles.row} ${isLive || isHT ? styles.rowLive : ""}`}
     >
       {/* Status column */}
       <div className={styles.status}>

@@ -439,7 +439,9 @@ function MatchDetailInner() {
   );
 
   const { homeTeam, awayTeam, score, status, league, statistics, events, date, halfTimeScore, venue, referee } = match;
-  const isLive     = status === "LIVE" || status === "HT";
+  const today = new Date().toDateString();
+  const matchDate = new Date(date).toDateString();
+  const isLive     = (status === "LIVE" || status === "HT") && matchDate === today;
   const isFinished = status === "FT";
   const isUpcoming = status === "NS";
   const homeWin    = isFinished && (score.home ?? 0) > (score.away ?? 0);
