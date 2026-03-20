@@ -262,29 +262,12 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   // Progressive rendering — show 8 groups first, load more as user scrolls
   const INITIAL_GROUPS = 8;
   const BATCH_SIZE     = 10;
-  const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
-  const sentinelRef    = useRef<HTMLDivElement>(null);
-  const groupsLenRef   = useRef(0);
+const [currentPage, setCurrentPage] = useState(1);
+  const GROUPS_PER_PAGE = 8;
 
-  // Reset visible count when matches change
-  useEffect(() => { setVisibleCount(INITIAL_GROUPS); }, [selectedDate]);
 
-  // Stable IntersectionObserver — doesn't recreate on every render
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting)
-        setVisibleCount(v => Math.min(v + BATCH_SIZE, groupsLenRef.current));
-    }, { rootMargin: "400px" });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []); // stable — no dependencies
 
-  // Keep groupsLenRef in sync without recreating the observer
-  groupsLenRef.current = groups.length;
-
-  const visibleGroups = groups.slice(0, visibleCount);
+const visibleGroups = groups.slice(0, currentPage * GROUPS_PER_PAGE);
 
   // Handle saving/unsaving matches
   const handleSaveToggle = (matchId: number) => {
@@ -433,10 +416,26 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
           <LeagueGroup key={group.leagueId} group={group} savedMatchIds={savedMatchIds} onSaveToggle={handleSaveToggle} />
         ))}
 
-        {/* Sentinel — triggers loading next batch */}
-        {!loading && visibleCount < groups.length && (
-          <div ref={sentinelRef} style={{ padding: "12px", textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>
-            Showing {visibleCount} of {groups.length} leagues…
+        {/* Pagination */}
+        {!loading && groups.length > GROUPS_PER_PAGE && (
+          <div className={styles.pagination}>
+            <button 
+              className={styles.pageBtn}
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+            >
+              ← Prev
+            </button>
+            <span className={styles.pageInfo}>
+              Page {currentPage}
+            </span>
+            <button 
+              className={styles.pageBtn}
+              disabled={currentPage * GROUPS_PER_PAGE >= groups.length}
+              onClick={() => setCurrentPage(p => p + 1)}
+            >
+              Next →
+            </button>
           </div>
         )}
       </div>
