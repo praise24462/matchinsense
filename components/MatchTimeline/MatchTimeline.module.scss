@@ -1,0 +1,271 @@
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 16px;
+  svg {
+    opacity: 0.6;
+  }
+}
+
+.empty {
+  padding: 32px 20px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timelineGroup {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.minuteBadge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  padding-top: 2px;
+}
+
+.eventsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--bg-card-hi);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+
+  &:hover {
+    background: var(--bg-card);
+    border-color: var(--accent-dim);
+  }
+
+  &.eventHome {
+    border-left: 3px solid rgba(57, 255, 20, 0.3);
+  }
+
+  &.eventAway {
+    border-left: 3px solid rgba(100, 150, 255, 0.3);
+  }
+}
+
+.eventIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.goalIcon {
+  color: var(--accent);
+}
+
+.card {
+  width: 16px;
+  height: 24px;
+  border-radius: 2px;
+
+  &.redCard {
+    background: var(--red);
+  }
+
+  &.yellowCard {
+    background: var(--yellow);
+  }
+}
+
+.subIcon {
+  color: var(--text-2);
+}
+
+.eventContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.eventTeam {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.eventText {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  flex-wrap: wrap;
+
+  strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+}
+
+.assist {
+  font-size: 10px;
+  color: var(--text-3);
+  font-style: italic;
+}
+
+.badge,
+.badgeOwn,
+.badgeRed,
+.badgeYellow {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.badge {
+  background: rgba(57, 255, 20, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(57, 255, 20, 0.25);
+}
+
+.badgeOwn {
+  background: rgba(255, 100, 100, 0.15);
+  color: #ff6464;
+  border: 1px solid rgba(255, 100, 100, 0.25);
+}
+
+.badgeRed {
+  background: rgba(255, 59, 59, 0.2);
+  color: var(--red);
+  border: 1px solid rgba(255, 59, 59, 0.3);
+}
+
+.badgeYellow {
+  background: rgba(255, 214, 10, 0.15);
+  color: var(--yellow);
+  border: 1px solid rgba(255, 214, 10, 0.25);
+}
+
+/* Substitution Styling */
+.subDetail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  font-size: 11px;
+}
+
+.subOut,
+.subIn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  background: var(--border);
+  border-radius: 3px;
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.subLabel {
+  font-size: 8px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.subArrow {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .timelineGroup {
+    grid-template-columns: 40px 1fr;
+    gap: 8px;
+    padding: 10px 0;
+  }
+
+  .minuteBadge {
+    font-size: 11px;
+  }
+
+  .event {
+    gap: 6px;
+    padding: 6px 10px;
+  }
+
+  .eventIcon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .eventText {
+    font-size: 11px;
+  }
+
+  .subDetail {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .subOut,
+  .subIn {
+    width: 100%;
+  }
+}

@@ -1,0 +1,76 @@
+.footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+  padding: 32px 20px 28px;
+  margin-top: auto;
+  width: 100%;
+}
+
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.brand {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.logoMark {
+  width: 26px; height: 26px;
+  background: var(--accent); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 300;
+  color: var(--text);
+  strong { font-weight: 800; color: var(--accent); }
+}
+
+.tagline {
+  font-size: 12px;
+  color: var(--text-3);
+  max-width: 400px;
+  line-height: 1.6;
+}
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.link {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition: color 0.15s;
+  &:hover { color: var(--accent); }
+}
+
+.dot {
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+
+.copy {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.6;
+}
+
+.disclaimer {
+  opacity: 0.6;
+  @media (max-width: 480px) { display: block; margin-top: 4px; }
+}

@@ -1,0 +1,64 @@
+.page { padding-top: 62px; min-height: 100vh; background: var(--bg); }
+.container { max-width: 760px; margin: 0 auto; padding: 32px 24px 80px; @media (max-width: 640px) { padding: 24px 16px 60px; } }
+
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; }
+.pageTitle { font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--text); }
+.pageSubtitle { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+.countBadge { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(240,165,0,0.2); padding: 4px 12px; border-radius: 99px; }
+
+.state { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 80px 0; color: var(--text-2); font-size: 14px; }
+.spinner { width: 28px; height: 28px; border: 2px solid var(--border-hi); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.75s linear infinite; }
+
+.emptyState { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 80px 24px; text-align: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; }
+.emptyIcon { font-size: 40px; opacity: 0.4; }
+.emptyTitle { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--text); }
+.emptyText { font-size: 14px; color: var(--text-2); line-height: 1.65; max-width: 320px; strong { color: var(--text); } }
+.browseBtn { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(240,165,0,0.2); padding: 9px 20px; border-radius: 10px; transition: background 0.15s; &:hover { background: var(--accent-mid); } }
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  display: flex; align-items: stretch;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  overflow: hidden; transition: border-color 0.15s;
+  &:hover { border-color: var(--border-hi); }
+}
+.matchPreview {
+  flex: 1; padding: 16px 20px; text-decoration: none;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.matchLeague {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; color: var(--text-3);
+}
+.statusPill { margin-left: auto; font-size: 10px; font-weight: 700; font-family: var(--font-mono); padding: 2px 7px; border-radius: 3px; }
+.statusFT   { background: rgba(255,255,255,0.06); color: var(--text-3); }
+.statusLive { background: rgba(34,197,94,0.15); color: var(--green); }
+.statusNS   { background: rgba(0,184,217,0.1);  color: var(--cyan); }
+
+.matchBody { display: flex; align-items: center; gap: 12px; }
+.teamRow { display: flex; align-items: center; gap: 8px; flex: 1; }
+.teamRowAway { flex-direction: row-reverse; text-align: right; }
+.teamName { font-size: 14px; font-weight: 700; color: var(--text); }
+.scoreBox { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.scoreDigit { font-size: 20px; font-weight: 800; font-family: var(--font-mono); color: var(--text); line-height: 1; }
+.scoreSep { font-size: 16px; color: var(--text-3); }
+.scoreVs { font-size: 13px; font-family: var(--font-mono); color: var(--text-3); }
+.matchDate { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
+
+.removeBtn {
+  width: 44px; flex-shrink: 0; background: none; border: none; border-left: 1px solid var(--border);
+  color: var(--text-3); cursor: pointer; font-size: 13px;
+  transition: color 0.15s, background 0.15s;
+  &:hover:not(:disabled) { color: var(--red); background: rgba(240,68,68,0.06); }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+// Guest
+.guestWrap { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 62px); gap: 14px; text-align: center; padding: 24px; }
+.guestIcon { font-size: 40px; opacity: 0.5; }
+.guestTitle { font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--text); }
+.guestText { font-size: 14px; color: var(--text-2); max-width: 320px; line-height: 1.65; }
+.signInBtn { margin-top: 8px; background: var(--accent); color: #000; font-weight: 700; font-size: 14px; border: none; border-radius: 10px; padding: 12px 28px; cursor: pointer; transition: opacity 0.15s; &:hover { opacity: 0.88; } }
+
+@keyframes spin { to { transform: rotate(360deg); } }

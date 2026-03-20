@@ -1,0 +1,125 @@
+.header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  height: 56px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-base);
+    color: var(--text);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
+.logo {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  &:hover { opacity: 0.8; }
+}
+
+// ── Right area ────────────────────────────────────────────────────────────────
+.rightArea {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav {
+  display: flex; align-items: center; gap: 2px;
+  @media (max-width: 600px) { display: none; }
+}
+
+.link {
+  font-size: 13px; font-weight: 500; color: var(--text-2);
+  padding: 5px 14px; border-radius: 99px;
+  transition: color 0.15s, background 0.15s;
+  &:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+}
+.linkActive {
+  color: var(--accent) !important;
+  background: var(--accent-dim) !important;
+  font-weight: 600;
+}
+
+// ── User ──────────────────────────────────────────────────────────────────────
+.userArea { position: relative; margin-left: 8px; }
+
+.avatarBtn {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: 1px solid var(--border-hi);
+  cursor: pointer; padding: 4px 8px 4px 4px;
+  border-radius: 99px; color: var(--text-2);
+  transition: border-color 0.15s;
+  &:hover { border-color: var(--accent); }
+  @media (max-width: 600px) { display: none; }
+}
+.avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.avatarFallback {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent-dim); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+}
+.chevronUp { transform: rotate(180deg); transition: transform 0.2s; }
+
+.dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--bg-card); border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg); overflow: hidden; min-width: 160px;
+  box-shadow: 0 20px 48px rgba(0,0,0,0.7); z-index: 300;
+  animation: fadeUp 0.15s var(--ease);
+}
+.dropdownItem {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; font-size: 13px; font-weight: 500;
+  color: var(--text-2); background: none; border: none;
+  cursor: pointer; width: 100%; text-decoration: none;
+  transition: background 0.1s, color 0.1s;
+  &:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+}
+.dropdownSignOut { color: var(--text-3); &:hover { color: var(--red) !important; } }
+.dropdownDivider { border-top: 1px solid var(--border); margin: 2px 0; }
+
+// ── Hamburger ─────────────────────────────────────────────────────────────────
+.hamburger {
+  display: none;
+  background: none; border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 6px; cursor: pointer;
+  color: var(--text-2); margin-left: 8px;
+  @media (max-width: 600px) { display: flex; align-items: center; justify-content: center; }
+}
+
+// ── Mobile menu ───────────────────────────────────────────────────────────────
+.mobileMenu {
+  position: fixed; top: 56px; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 190;
+  display: flex; flex-direction: column; padding: 8px 0;
+  animation: fadeIn 0.15s var(--ease); overflow-y: auto;
+}
+.mobileLink {
+  display: flex; align-items: center; padding: 14px 20px;
+  font-size: 16px; font-weight: 500; color: var(--text-2);
+  background: none; border: none; text-decoration: none; cursor: pointer;
+  font-family: var(--font-body); border-left: 3px solid transparent;
+  transition: all 0.1s;
+  &:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+}
+.mobileLinkActive { color: var(--accent) !important; border-left-color: var(--accent); background: var(--accent-dim) !important; }
+.mobileLinkDanger { color: var(--text-3); &:hover { color: var(--red) !important; } }
+.mobileDivider { border-top: 1px solid var(--border); margin: 8px 0; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }

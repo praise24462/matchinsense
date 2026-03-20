@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 72" width="340" height="72">
+  <!-- Badge -->
+  <rect x="0" y="0" width="72" height="72" rx="14" fill="#ff4b2b"/>
+  <text x="36" y="54" text-anchor="middle"
+    font-family="Impact, Arial Black, sans-serif"
+    font-size="52" font-weight="900"
+    fill="white">M</text>
+  <circle cx="60" cy="64" r="5" fill="white" opacity="0.9"/>
+
+  <!-- Wordmark — white text for dark backgrounds -->
+  <text x="92" y="30"
+    font-family="Helvetica Neue, Arial, sans-serif"
+    font-size="22" font-weight="300"
+    fill="#ffffff" letter-spacing="1">MATCH</text>
+  <text x="92" y="56"
+    font-family="Helvetica Neue, Arial, sans-serif"
+    font-size="22" font-weight="800"
+    fill="#ff4b2b" letter-spacing="1">INSENSE</text>
+
+  <!-- Divider -->
+  <line x1="253" y1="12" x2="253" y2="60" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+
+  <!-- LIVE pill — filled -->
+  <rect x="263" y="12" width="44" height="20" rx="10" fill="#ff4b2b"/>
+  <text x="285" y="26" text-anchor="middle"
+    font-family="Helvetica Neue, Arial, sans-serif"
+    font-size="10" font-weight="700"
+    fill="white" letter-spacing="0.8">LIVE</text>
+
+  <!-- AI pill — outlined -->
+  <rect x="263" y="40" width="36" height="20" rx="10" fill="none" stroke="#ff4b2b" stroke-width="1.5"/>
+  <text x="281" y="54" text-anchor="middle"
+    font-family="Helvetica Neue, Arial, sans-serif"
+    font-size="10" font-weight="700"
+    fill="#ff4b2b" letter-spacing="0.8">AI</text>
+</svg>
