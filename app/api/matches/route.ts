@@ -2,17 +2,18 @@
  * /api/matches?date=YYYY-MM-DD
  *
  * Read order:
- *   1. Database (Supabase) — zero API calls, serves all users
- *   2. api-sports API     — only if DB has no data for this date
+ *   1. Redis cache     — fastest, persistent across restarts
+ *   2. Database        — zero API calls, serves all users
+ *   3. api-sports API  — only if DB has no data for this date
  *
  * The DB is populated by /api/sync (called by cron, not users).
- * This means 1000 users can load today's matches = 0 API calls.
+ * This means 100,000 users can load today's matches = 0 API calls.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
 import { prisma } from "@/services/prisma";
-import { withCache, ttlForDate } from "@/services/apiCache";
+import { ttlForDate } from "@/services/apiCache";
 import { getCached, setCached } from "@/services/redisCache";
 
 const AS_BASE = "https://v3.football.api-sports.io";
@@ -34,7 +35,6 @@ const STATUS_MAP: Record<string, string> = {
   HT:"HT", NS:"NS", TBD:"NS", PST:"PST", SUSP:"PST", CANC:"CANC",
 };
 
-const LIVE_STATUSES  = new Set(["LIVE","HT","1H","2H","ET","BT","P"]);
 const AFRICAN_COUNTRIES = new Set([
   "Algeria","Angola","Benin","Botswana","Burkina Faso","Burundi","Cameroon",
   "Cape Verde","Central African Republic","Chad","Comoros","Congo","Djibouti",
@@ -112,77 +112,114 @@ export async function GET(req: NextRequest) {
   const date = url.searchParams.get("date") ?? localDate();
 
   const apiKey = process.env.FOOTBALL_API_KEY ?? "";
-  if (!apiKey) return NextResponse.json({ error: "FOOTBALL_API_KEY not configured" }, { status: 500 });
+  if (!apiKey) {
+    return NextResponse.json({ error: "FOOTBALL_API_KEY not configured" }, { status: 500 });
+  }
+
+  const redisCacheKey = `fixtures:${date}`;
 
   try {
-    // ── Try API with cache (skip DB to avoid connection issues) ──────────────────
-    const fetcher = async (): Promise<Match[]> => {
-      const res = await fetch(`${AS_BASE}/fixtures?date=${date}`, {
-        headers: { "x-apisports-key": apiKey },
-        cache: "no-store",
-      });
-      
-      // Handle quota exceeded (429) — throw so client knows
-      if (res.status === 429) {
-        throw new Error("QUOTA_EXCEEDED");
-      }
-      
-      if (!res.ok) {
-        console.error("api-sports HTTP error:", res.status);
-        return [];
-      }
-
-      const data = await res.json();
-      if (data.errors && Object.keys(data.errors).length > 0) {
-        console.error("api-sports API errors:", data.errors);
-        return [];
-      }
-      return sortMatches(parseFixtures(data.response ?? []));
-    };
-
-    const hasLive    = false;
-    const estimatedTtl = ttlForDate(date, hasLive);
-    
-    // Try Redis first (persistent cache across server restarts)
-    const redisCacheKey = `fixtures:${date}`;
-    let redisData: Match[] | null = null;
-    
+    // ── TIER 1: Redis cache ──────────────────────────────────────────────────
     try {
-      redisData = await getCached<Match[]>(redisCacheKey);
+      const redisData = await getCached<Match[]>(redisCacheKey);
       if (redisData && redisData.length > 0) {
-        return NextResponse.json(redisData, {
-          headers: { "X-Cache": "REDIS", "X-Cache-Date": date },
+        // Skip Redis cache if any match is live — need fresh data
+        const hasLive = redisData.some(
+          (m) => m.status === "LIVE" || m.status === "HT"
+        );
+        if (!hasLive) {
+          console.log(`[matches] Serving ${redisData.length} matches from Redis`);
+          return NextResponse.json(redisData, {
+            headers: { "X-Cache": "REDIS", "X-Cache-Date": date },
+          });
+        }
+        console.log("[matches] Live matches in Redis cache — fetching fresh from DB");
+      }
+    } catch (redisErr) {
+      console.warn("[matches] Redis read failed, trying DB:", redisErr);
+    }
+
+    // ── TIER 2: Database ─────────────────────────────────────────────────────
+    try {
+      const rows = await prisma.match.findMany({
+        where: { date },
+        orderBy: { kickoff: "asc" },
+      });
+
+      if (rows && rows.length > 0) {
+        const matches = sortMatches(rows.map(dbRowToMatch));
+        console.log(`[matches] Serving ${matches.length} matches from DB`);
+
+        // Cache in Redis — use short TTL if any match is live
+        const anyLive = matches.some(
+          (m) => m.status === "LIVE" || m.status === "HT"
+        );
+        const redisTtl = anyLive ? 60 : ttlForDate(date, false);
+
+        try {
+          await setCached(redisCacheKey, matches, redisTtl);
+        } catch (redisWriteErr) {
+          console.warn("[matches] Redis write failed (non-blocking):", redisWriteErr);
+        }
+
+        return NextResponse.json(matches, {
+          headers: { "X-Cache": "DB", "X-Cache-Date": date },
         });
       }
-    } catch (redisErr) {
-      console.warn("[matches] Redis read failed, continuing:", redisErr);
+
+      console.log(`[matches] No data in DB for ${date} — falling back to API`);
+    } catch (dbErr) {
+      console.warn("[matches] DB read failed, falling back to API:", dbErr);
     }
-    
-    // If no Redis cache, fetch from API
-    const { data: matches, hit } = await withCache<Match[]>(
-      `fixtures:${date}`,
-      fetcher,
-      estimatedTtl,
-    );
-    
-    // Try to cache to Redis (non-blocking)
-    try {
-      if (matches && matches.length > 0) {
-        await setCached(redisCacheKey, matches, estimatedTtl);
-      }
-    } catch (redisErr) {
-      console.warn("[matches] Redis write failed (non-blocking):", redisErr);
-    }
-    
-    return NextResponse.json(matches, {
-      headers: { "X-Cache": hit.toUpperCase(), "X-Cache-Date": date },
+
+    // ── TIER 3: Football API (last resort only) ───────────────────────────────
+    console.warn(`[matches] Hitting Football API for ${date} — DB miss`);
+
+    const res = await fetch(`${AS_BASE}/fixtures?date=${date}`, {
+      headers: { "x-apisports-key": apiKey },
+      cache: "no-store",
     });
+
+    if (res.status === 429) {
+      return NextResponse.json({ error: "QUOTA_EXCEEDED" }, { status: 429 });
+    }
+
+    if (!res.ok) {
+      console.error("[matches] API HTTP error:", res.status);
+      return NextResponse.json([], { status: 200 });
+    }
+
+    const data = await res.json();
+
+    if (data.errors && Object.keys(data.errors).length > 0) {
+      console.error("[matches] API errors:", data.errors);
+      return NextResponse.json([], { status: 200 });
+    }
+
+    const matches = sortMatches(parseFixtures(data.response ?? []));
+
+    // Cache API result in Redis
+    if (matches.length > 0) {
+      const anyLive = matches.some(
+        (m) => m.status === "LIVE" || m.status === "HT"
+      );
+      const redisTtl = anyLive ? 60 : ttlForDate(date, false);
+      try {
+        await setCached(redisCacheKey, matches, redisTtl);
+      } catch (redisWriteErr) {
+        console.warn("[matches] Redis write failed (non-blocking):", redisWriteErr);
+      }
+    }
+
+    return NextResponse.json(matches, {
+      headers: { "X-Cache": "API", "X-Cache-Date": date },
+    });
+
   } catch (err: any) {
     console.error("[matches] Route error:", err);
     if (err.message === "QUOTA_EXCEEDED") {
       return NextResponse.json({ error: "QUOTA_EXCEEDED" }, { status: 429 });
     }
-    // Return empty array on any error
     return NextResponse.json([], { status: 200 });
   }
 }
