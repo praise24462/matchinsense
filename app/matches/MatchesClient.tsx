@@ -103,42 +103,47 @@ const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
   const isNS   = match.status === "NS";
   const homeWin = isFT && (match.score.home ?? 0) > (match.score.away ?? 0);
   const awayWin = isFT && (match.score.away ?? 0) > (match.score.home ?? 0);
+  const matchHref = `/match/${match.id}?source=${match.source}`;
+  const isFdMatch = match.id < 600000;
+  const teamSrc = match.source === "africa" ? "africa" : isFdMatch ? "fd" : "euro";
   return (
-    <Link href={`/match/${match.id}?source=${match.source}`} className={styles.matchRow}>
-      <div className={styles.matchTime}>
+    <div className={styles.matchRow}>
+      {/* Clickable time/score area → goes to match detail */}
+      <Link href={matchHref} className={styles.matchTimeLink}>
         {isLive ? <span className={styles.liveTag}>{match.status}</span>
           : isFT ? <span className={styles.ftTag}>FT</span>
           : isNS ? <span className={styles.nsTime}>{fmtTime(match.date)}</span>
           : <span className={styles.otherStatus}>{match.status}</span>}
-      </div>
+      </Link>
       <div className={styles.matchTeams}>
         <div className={styles.teamLine}>
           <Logo src={match.homeTeam.logo} size={18} fallback={match.homeTeam.name[0]} />
-          <Link href={`/team/${match.homeTeam.id}`} onClick={e => e.stopPropagation()}
+          <Link href={`/team/${match.homeTeam.id}?source=${teamSrc}`}
             className={`${styles.teamName} ${homeWin ? styles.teamWinner : ""}`} style={{textDecoration:"none"}}>
             {match.homeTeam.name}
           </Link>
         </div>
         <div className={styles.teamLine}>
           <Logo src={match.awayTeam.logo} size={18} fallback={match.awayTeam.name[0]} />
-          <Link href={`/team/${match.awayTeam.id}`} onClick={e => e.stopPropagation()}
+          <Link href={`/team/${match.awayTeam.id}?source=${teamSrc}`}
             className={`${styles.teamName} ${awayWin ? styles.teamWinner : ""}`} style={{textDecoration:"none"}}>
             {match.awayTeam.name}
           </Link>
         </div>
       </div>
-      <div className={styles.matchScore}>
+      {/* Score area → goes to match detail */}
+      <Link href={matchHref} className={styles.matchScoreLink}>
         {isNS ? <span className={styles.scoreDash}>-</span> : (
           <>
             <span className={`${styles.scoreNum} ${homeWin ? styles.scoreWin : ""}`}>{match.score.home ?? "–"}</span>
             <span className={`${styles.scoreNum} ${awayWin ? styles.scoreWin : ""}`}>{match.score.away ?? "–"}</span>
           </>
         )}
-      </div>
-      <button className={styles.starBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); }} aria-label="Follow">
+      </Link>
+      <button className={styles.starBtn} onClick={() => {}} aria-label="Follow">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
-    </Link>
+    </div>
   );
 });
 

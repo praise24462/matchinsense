@@ -262,7 +262,7 @@
 .matchRow {
   display: grid;
   grid-template-columns: 60px 1fr 36px 40px;
-  align-items: center; text-decoration: none;
+  align-items: center;
   border-bottom: 1px solid rgba(255,255,255,0.05);
   min-height: 58px; transition: background 0.08s;
   &:last-child { border-bottom: none; }
@@ -299,9 +299,10 @@
 }
 .teamWinner { color: var(--text) !important; font-weight: 700; }
 
-.matchScore {
+.matchScore, .matchScoreLink {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 7px; padding: 10px 4px;
+  text-decoration: none;
 }
 .scoreNum  { font-size: 14px; font-weight: 700; font-family: var(--font-mono); color: var(--text-3); line-height: 1; }
 .scoreWin  { color: var(--text) !important; }
