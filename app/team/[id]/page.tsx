@@ -274,7 +274,7 @@ function TeamPageInner() {
   const [leagueId, setLeagueId] = useState<number | null>(null);
   const [logoErr,  setLogoErr]  = useState(false);
 
-  const [fdTeamInfo, setFdTeamInfo] = useState<{name:string;logo:string;country:string;founded:number;leagueId:number} | null>(null);
+  const [fdTeamInfo, setFdTeamInfo] = useState<{name:string;logo:string;country:string;founded:number;leagueId:number;venue?:{name:string;city:string;capacity:number;image:string}} | null>(null);
 
   const loadHistory = useCallback(async (lgId: number, seas: number, src: string) => {
     try {
@@ -382,10 +382,10 @@ function TeamPageInner() {
             <div className={styles.heroMeta}>
               {team?.country  && <span className={styles.heroBadge}>{team.country}</span>}
               {team?.founded  && <span className={styles.heroLeague}>Est. {team.founded}</span>}
-              {team?.venue?.name && (
+              {team && 'venue' in team && team.venue?.name && (
                 <span className={styles.heroLeague}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  {team.venue.name}
+                  {(team as any).venue.name}
                 </span>
               )}
             </div>
@@ -514,15 +514,15 @@ function TeamPageInner() {
               </>
             ) : <div className={styles.empty}>No season data available.</div>}
 
-            {team?.venue?.name && (
+            {team && 'venue' in team && (team as TeamInfo)?.venue?.name && (
               <Card title="Stadium">
-                {team.venue.image && (
-                  <img src={team.venue.image} alt={team.venue.name} style={{ width:"100%", borderRadius:6, marginBottom:10, maxHeight:160, objectFit:"cover" }} />
+                {(team as TeamInfo).venue.image && (
+                  <img src={(team as TeamInfo).venue.image} alt={(team as TeamInfo).venue.name} style={{ width:"100%", borderRadius:6, marginBottom:10, maxHeight:160, objectFit:"cover" }} />
                 )}
-                <div style={{ fontSize:15, fontWeight:700, color:"var(--text)" }}>{team.venue.name}</div>
-                <div style={{ fontSize:12, color:"var(--text-3)", marginTop:4 }}>{team.venue.city}</div>
-                {team.venue.capacity > 0 && (
-                  <div style={{ fontSize:12, color:"var(--text-3)", marginTop:2 }}>Capacity: {team.venue.capacity.toLocaleString()}</div>
+                <div style={{ fontSize:15, fontWeight:700, color:"var(--text)" }}>{(team as TeamInfo).venue.name}</div>
+                <div style={{ fontSize:12, color:"var(--text-3)", marginTop:4 }}>{(team as TeamInfo).venue.city}</div>
+                {(team as TeamInfo).venue.capacity > 0 && (
+                  <div style={{ fontSize:12, color:"var(--text-3)", marginTop:2 }}>Capacity: {(team as TeamInfo).venue.capacity.toLocaleString()}</div>
                 )}
               </Card>
             )}
