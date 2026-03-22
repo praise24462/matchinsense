@@ -1,18 +1,10 @@
 [build]
-  command = "npx prisma generate && npm run build"
+  command = "npm run build"
   publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--include=dev"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-
-[[crons]]
-  schedule = "*/5 * * * *"
-  path = "/api/sync?secret=praise2234&mode=live"
-
-[[crons]]
-  schedule = "0 * * * *"
-  path = "/api/sync?secret=praise2234&mode=daily"
-
-[[crons]]
-  schedule = "0 0 * * *"
-  path = "/api/sync?secret=praise2234&mode=daily"
