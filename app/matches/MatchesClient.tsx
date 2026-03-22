@@ -2,14 +2,9 @@
 
 import { useEffect, useState, useRef, memo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import type { Match } from "@/types";
-import { ALL_POPULAR_TEAMS } from "@/data/popularTeams";
 import styles from "./matches.module.scss";
 
-// Competitions sidebar is built dynamically from loaded matches — no hardcoded list needed.
-
-// Use UTC dates to match api-sports.io which operates on UTC
 function todayIso() {
   return new Date().toISOString().split("T")[0];
 }
@@ -18,7 +13,6 @@ function offsetToIso(offset: number) {
   d.setUTCDate(d.getUTCDate() + offset);
   return d.toISOString().split("T")[0];
 }
-// Default to yesterday if UTC hour is before 6am (matches not started yet)
 function smartDefaultDate() {
   const hour = new Date().getUTCHours();
   if (hour < 6) return offsetToIso(-1);
@@ -89,7 +83,18 @@ const Logo = memo(function Logo({ src, size, fallback }: { src: string; size: nu
       {fallback ?? "?"}
     </div>
   );
-  return <Image src={src} alt="" width={size} height={size} style={{ objectFit: "contain", flexShrink: 0 }} onError={() => setErr(true)} />;
+  // Use plain img — works with SVG crests from football-data.org and api-football
+  return (
+    <img
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      style={{ objectFit: "contain", flexShrink: 0, width: size, height: size }}
+      onError={() => setErr(true)}
+      loading="lazy"
+    />
+  );
 });
 
 const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
@@ -109,11 +114,17 @@ const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
       <div className={styles.matchTeams}>
         <div className={styles.teamLine}>
           <Logo src={match.homeTeam.logo} size={18} fallback={match.homeTeam.name[0]} />
-          <span className={`${styles.teamName} ${homeWin ? styles.teamWinner : ""}`}>{match.homeTeam.name}</span>
+          <Link href={`/team/${match.homeTeam.id}`} onClick={e => e.stopPropagation()}
+            className={`${styles.teamName} ${homeWin ? styles.teamWinner : ""}`} style={{textDecoration:"none"}}>
+            {match.homeTeam.name}
+          </Link>
         </div>
         <div className={styles.teamLine}>
           <Logo src={match.awayTeam.logo} size={18} fallback={match.awayTeam.name[0]} />
-          <span className={`${styles.teamName} ${awayWin ? styles.teamWinner : ""}`}>{match.awayTeam.name}</span>
+          <Link href={`/team/${match.awayTeam.id}`} onClick={e => e.stopPropagation()}
+            className={`${styles.teamName} ${awayWin ? styles.teamWinner : ""}`} style={{textDecoration:"none"}}>
+            {match.awayTeam.name}
+          </Link>
         </div>
       </div>
       <div className={styles.matchScore}>
@@ -153,6 +164,7 @@ const LeagueGroup = memo(function LeagueGroup({ group }: { group: GroupData }) {
   );
 });
 
+
 export default function MatchesClient({ initialMatches, initialError }: Props) {
   const [matches,      setMatches]      = useState<Match[]>(initialMatches);
   const [loading,      setLoading]      = useState(false);
@@ -163,13 +175,12 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   const [search,       setSearch]       = useState("");
   const [filterComp,   setFilterComp]   = useState<string | null>(null);
 
-  // Show 5 days: 2 days ago → today → tomorrow
-  // Gives access to matches even across midnight timezone boundary
+
   const MIN_DATE  = offsetToIso(-2);
   const MAX_DATE  = offsetToIso(1);
   const dateStrip = [-2, -1, 0, 1].map(i => ({ iso: offsetToIso(i), label: isoLabel(offsetToIso(i)) }));
 
-  // Single effect — fetches once per date, stops on quota error
+  // Fetch main matches
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -180,12 +191,8 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
       .then(r => r.json())
       .then(data => {
         if (cancelled) return;
-        if (Array.isArray(data)) {
-          setMatches(data);
-        } else {
-          // API quota exceeded or other error — don't retry
-          setFetchError("quota");
-        }
+        if (Array.isArray(data)) setMatches(data);
+        else setFetchError("quota");
       })
       .catch(() => { if (!cancelled) setFetchError("network"); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -193,38 +200,24 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     return () => { cancelled = true; };
   }, [selectedDate]);
 
-  // Auto-refresh every 60s for today — only when no error
-  useEffect(() => {
-    if (selectedDate !== todayIso() || fetchError) return;
-    const iv = setInterval(() => {
-      fetch(`/api/matches?date=${selectedDate}`)
-        .then(r => r.json())
-        .then(data => { if (Array.isArray(data) && data.length > 0) setMatches(data); })
-        .catch(() => {});
-    }, 60000);
-    return () => clearInterval(iv);
-  }, [selectedDate, fetchError]);
 
+
+  // Filtered display
   let display = matches;
   if (liveOnly) display = display.filter(m => m.status === "LIVE" || m.status === "HT");
-  if (filterComp) {
-    display = display.filter(m => String(m.league.id) === filterComp);
-  }
+  if (filterComp) display = display.filter(m => String(m.league.id) === filterComp);
 
   const groups = groupByLeague(display);
   const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
 
-  // Progressive rendering — show 8 groups first, load more as user scrolls
   const INITIAL_GROUPS = 8;
   const BATCH_SIZE     = 10;
   const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
   const sentinelRef    = useRef<HTMLDivElement>(null);
   const groupsLenRef   = useRef(0);
 
-  // Reset visible count when matches change
   useEffect(() => { setVisibleCount(INITIAL_GROUPS); }, [selectedDate]);
 
-  // Stable IntersectionObserver — doesn't recreate on every render
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -234,21 +227,37 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     }, { rootMargin: "400px" });
     obs.observe(el);
     return () => obs.disconnect();
-  }, []); // stable — no dependencies
+  }, []);
 
-  // Keep groupsLenRef in sync without recreating the observer
   groupsLenRef.current = groups.length;
-
   const visibleGroups = groups.slice(0, visibleCount);
 
-  // Build competitions list dynamically from whatever matches are loaded
+  // Competitions for search
+  // Priority leagues shown first in sidebar, rest alphabetical
+  const SIDEBAR_PRIORITY: Record<string, number> = {
+    "2": 1, "3": 2, "848": 3,       // UCL, UEL, UECL
+    "39": 4, "140": 5, "135": 6,    // PL, La Liga, Serie A
+    "78": 7, "61": 8,               // Bundesliga, Ligue 1
+    "12": 9, "20": 10, "6": 11,     // CAF CL, CAF CC, AFCON
+    "399": 12,                       // NPFL
+    "288": 13, "167": 14,           // PSL, Egypt
+    "13": 15, "11": 16,             // Copa Libertadores, Copa Sud
+    "71": 17, "128": 18,            // Brazil, Argentina
+  };
+
   const allComps = Array.from(
     new Map(matches.map(m => [m.league.id, { code: String(m.league.id), name: m.league.name, country: m.league.country, logo: m.league.logo }])).values()
-  ).sort((a, b) => a.country.localeCompare(b.country) || a.name.localeCompare(b.name));
+  ).sort((a, b) => {
+    const aPri = SIDEBAR_PRIORITY[a.code] ?? 999;
+    const bPri = SIDEBAR_PRIORITY[b.code] ?? 999;
+    if (aPri !== bPri) return aPri - bPri;
+    return a.country.localeCompare(b.country) || a.name.localeCompare(b.name);
+  });
 
   const searchLower = search.toLowerCase();
-  const sideTeams = searchLower ? ALL_POPULAR_TEAMS.filter(t => t.name.toLowerCase().includes(searchLower) || t.country.toLowerCase().includes(searchLower)) : ALL_POPULAR_TEAMS.slice(0, 10);
-  const sideComps = searchLower ? allComps.filter(c => c.name.toLowerCase().includes(searchLower) || c.country.toLowerCase().includes(searchLower)) : allComps;
+  const sideComps = searchLower
+    ? allComps.filter(c => c.name.toLowerCase().includes(searchLower) || c.country.toLowerCase().includes(searchLower))
+    : allComps;
 
   return (
     <div className={styles.shell}>
@@ -259,9 +268,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input placeholder="Search teams, leagues…" value={search} onChange={e => setSearch(e.target.value)} />
           {search && <button className={styles.clearBtn} onClick={() => setSearch("")}>✕</button>}
-        </div>
-
-        {/* Competitions */}
+        </div>        {/* ── Competitions filter ── */}
         <div className={styles.sideGroup}>
           <div className={styles.sideGroupHead}><span>COMPETITIONS</span></div>
           {sideComps.map(c => (
@@ -343,7 +350,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
             <div className={styles.emptyIcon}>⏳</div>
             <h2 className={styles.emptyTitle}>Daily limit reached</h2>
             <p className={styles.emptyText}>The free API plan resets at 1:00 AM Lagos time. Yesterday's matches are still available.</p>
-            <button className={styles.emptyBtn} onClick={() => { const y = new Date(); y.setDate(y.getDate()-1); setSelectedDate(y); }}>
+            <button className={styles.emptyBtn} onClick={() => { const y = new Date(); y.setDate(y.getDate()-1); setSelectedDate(y.toISOString().split("T")[0]); }}>
               View yesterday's matches →
             </button>
           </div>
@@ -356,7 +363,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
             <h2 className={styles.emptyTitle}>{liveOnly ? "No live matches right now" : `No matches on ${isoLabel(selectedDate)}`}</h2>
             <p className={styles.emptyText}>{liveOnly ? "No games are currently in play." : "No fixtures found for this date."}</p>
             {liveOnly && <button className={styles.emptyBtn} onClick={() => setLiveOnly(false)}>Show all matches</button>}
-            {!liveOnly && <button className={styles.emptyBtn} onClick={() => { const y = new Date(); y.setDate(y.getDate()-1); setSelectedDate(y); }}>View yesterday →</button>}
+            {!liveOnly && <button className={styles.emptyBtn} onClick={() => { const y = new Date(); y.setDate(y.getDate()-1); setSelectedDate(y.toISOString().split("T")[0]); }}>View yesterday →</button>}
           </div>
         )}
 
@@ -365,7 +372,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
           <LeagueGroup key={group.leagueId} group={group} />
         ))}
 
-        {/* Sentinel — triggers loading next batch */}
+        {/* Sentinel */}
         {!loading && visibleCount < groups.length && (
           <div ref={sentinelRef} style={{ padding: "12px", textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>
             Showing {visibleCount} of {groups.length} leagues…

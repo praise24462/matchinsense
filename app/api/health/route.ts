@@ -14,7 +14,7 @@ export async function GET() {
 
   // Check environment variables
   checks.env = {
-    hasApiKey: !!process.env.FOOTBALL_API_KEY,
+    hasApiKey: !!process.env.FOOTBALL_DATA_API_KEY,
     hasDatabaseUrl: !!process.env.DATABASE_URL,
     hasRedisUrl: !!process.env.REDIS_URL,
   };

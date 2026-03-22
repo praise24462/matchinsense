@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const cached   = getCache(cacheKey);
   if (cached) return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
 
-  const key = process.env.FOOTBALL_API_KEY ?? "";
+  const key = process.env.FOOTBALL_DATA_API_KEY ?? "";
   if (!key) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
   try {

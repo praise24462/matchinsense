@@ -40,7 +40,7 @@ interface FormComparison {
 }
 
 async function fetchTeamFixtures(teamId: number, limit: number = 10) {
-  const key = process.env.FOOTBALL_API_KEY ?? "";
+  const key = process.env.FOOTBALL_DATA_API_KEY ?? "";
   const res = await fetch(`${AS_BASE}/fixtures?team=${teamId}&last=${limit}&status=FT`, {
     headers: { "x-apisports-key": key },
     cache: "no-store",

@@ -10,7 +10,6 @@ import MatchStats from "@/components/MatchStats/MatchStats";
 import SummaryBox from "@/components/SummaryBox/SummaryBox";
 import PreviewBox from "@/components/PreviewBox/PreviewBox";
 import PredictionBox from "@/components/PredictionBox/PredictionBox";
-// import MatchTimeline from "@/components/MatchTimeline/MatchTimeline"
 import styles from "./matchDetail.module.scss";
 
 function saveReportToStorage(report: {
@@ -439,9 +438,10 @@ function MatchDetailInner() {
   );
 
   const { homeTeam, awayTeam, score, status, league, statistics, events, date, halfTimeScore, venue, referee } = match;
-  const today = new Date().toDateString();
-  const matchDate = new Date(date).toDateString();
-  const isLive     = (status === "LIVE" || status === "HT") && matchDate === today;
+  // Detect API source from match ID — FD matches have small IDs
+  const isFdMatch = match.id < 600000;
+  const teamSource = source === "africa" ? "africa" : isFdMatch ? "fd" : "euro";
+  const isLive     = status === "LIVE" || status === "HT";
   const isFinished = status === "FT";
   const isUpcoming = status === "NS";
   const homeWin    = isFinished && (score.home ?? 0) > (score.away ?? 0);
@@ -479,10 +479,12 @@ function MatchDetailInner() {
 
           <div className={styles.scoreSection}>
             <div className={styles.teamSide}>
-              <div className={`${styles.teamCrest} ${homeWin ? styles.teamCrestWinner : ""}`}>
-                {homeTeam.logo ? <Image src={homeTeam.logo} alt={homeTeam.name} width={64} height={64} style={{objectFit:"contain"}}/> : <span className={styles.crestFallback}>{homeTeam.name[0]}</span>}
-              </div>
-              <span className={`${styles.teamName} ${homeWin ? styles.teamNameWinner : ""} ${awayWin ? styles.teamNameLoser : ""}`}>{homeTeam.name}</span>
+              <Link href={`/team/${homeTeam.id}?source=${teamSource}`} style={{textDecoration:"none"}}>
+                <div className={`${styles.teamCrest} ${homeWin ? styles.teamCrestWinner : ""}`}>
+                  {homeTeam.logo ? <Image src={homeTeam.logo} alt={homeTeam.name} width={64} height={64} style={{objectFit:"contain"}}/> : <span className={styles.crestFallback}>{homeTeam.name[0]}</span>}
+                </div>
+              </Link>
+              <Link href={`/team/${homeTeam.id}?source=${teamSource}`} className={`${styles.teamName} ${homeWin ? styles.teamNameWinner : ""} ${awayWin ? styles.teamNameLoser : ""}`} style={{textDecoration:"none"}}>{homeTeam.name}</Link>
               {homeGoals.length > 0 && (
                 <div className={styles.goalScorers}>
                   {homeGoals.map((g: any, i: number) => (
@@ -514,10 +516,12 @@ function MatchDetailInner() {
             </div>
 
             <div className={`${styles.teamSide} ${styles.teamSideRight}`}>
-              <div className={`${styles.teamCrest} ${awayWin ? styles.teamCrestWinner : ""}`}>
-                {awayTeam.logo ? <Image src={awayTeam.logo} alt={awayTeam.name} width={64} height={64} style={{objectFit:"contain"}}/> : <span className={styles.crestFallback}>{awayTeam.name[0]}</span>}
-              </div>
-              <span className={`${styles.teamName} ${awayWin ? styles.teamNameWinner : ""} ${homeWin ? styles.teamNameLoser : ""}`}>{awayTeam.name}</span>
+              <Link href={`/team/${awayTeam.id}?source=${teamSource}`} style={{textDecoration:"none"}}>
+                <div className={`${styles.teamCrest} ${awayWin ? styles.teamCrestWinner : ""}`}>
+                  {awayTeam.logo ? <Image src={awayTeam.logo} alt={awayTeam.name} width={64} height={64} style={{objectFit:"contain"}}/> : <span className={styles.crestFallback}>{awayTeam.name[0]}</span>}
+                </div>
+              </Link>
+              <Link href={`/team/${awayTeam.id}?source=${teamSource}`} className={`${styles.teamName} ${awayWin ? styles.teamNameWinner : ""} ${homeWin ? styles.teamNameLoser : ""}`} style={{textDecoration:"none"}}>{awayTeam.name}</Link>
               {awayGoals.length > 0 && (
                 <div className={`${styles.goalScorers} ${styles.goalScorersRight}`}>
                   {awayGoals.map((g: any, i: number) => (
@@ -538,10 +542,6 @@ function MatchDetailInner() {
           </div>
         </div>
       </div>
-
-      {/* {!isUpcoming && events.length > 0 && (
-        <MatchTimeline events={events} homeTeamName={homeTeam.name} awayTeamName={awayTeam.name} status={status} />
-      )} */}
 
       <TabsSection
         match={match} isUpcoming={isUpcoming} isFinished={isFinished} isLive={isLive}

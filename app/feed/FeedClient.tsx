@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { POPULAR_EURO_TEAMS, POPULAR_AFRICA_TEAMS } from "@/data/popularTeams";
 import styles from "./feed.module.scss";
 
@@ -12,7 +13,7 @@ function Logo({ src, size, fallback }: { src: string; size: number; fallback?: s
       {fallback ?? "?"}
     </div>
   );
-  return <Image src={src} alt="" width={size} height={size} style={{ objectFit: "contain", flexShrink: 0 }} onError={() => setErr(true)} />;
+  return <img src={src} alt="" width={size} height={size} style={{ objectFit: "contain", flexShrink: 0 }} onError={() => setErr(true)} loading="lazy" />;
 }
 
 export default function FeedClient() {
@@ -90,13 +91,13 @@ export default function FeedClient() {
             </div>
             <div className={styles.clubGrid}>
               {countryTeams.map(t => (
-                <div key={t.id} className={styles.clubCard}>
+                <Link key={t.id} href={`/team/${t.id}?source=${t.source}`} className={styles.clubCard} style={{textDecoration:"none"}}>
                   <div className={styles.clubLogoWrap}>
                     <Logo src={t.logo} size={40} fallback={t.shortName[0]} />
                   </div>
                   <span className={styles.clubName}>{t.shortName}</span>
                   <span className={styles.clubLeague}>{t.league}</span>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

@@ -12,7 +12,7 @@ export default function Loading() {
         }}/>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "var(--text-3)", letterSpacing: "0.18em", textTransform: "uppercase" }}>
-          SCOREEDGE
+          MATCHINSENSE...
         </span>
       </div>
     </div>

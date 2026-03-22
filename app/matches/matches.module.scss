@@ -1,26 +1,24 @@
-// ══ SHELL — mobile first ══════════════════════════════════════════════════════
+// ══ SHELL ═════════════════════════════════════════════════════════════════════
 .shell {
   display: flex;
-  flex-direction: column;
-  padding-top: 54px;
   min-height: 100vh;
   width: 100%;
+  padding-top: 54px;
 
-  // Desktop: sidebar + content side by side
-  @media (min-width: 760px) {
-    flex-direction: row;
-    max-width: 1200px;
+  @media (min-width: 960px) {
+    max-width: 1280px;
     margin: 0 auto;
   }
 }
 
-// ══ SIDEBAR — desktop only ════════════════════════════════════════════════════
+// ══ SIDEBAR ═══════════════════════════════════════════════════════════════════
 .sidebar {
   display: none;
 
   @media (min-width: 760px) {
-    display: block;
-    width: 220px;
+    display: flex;
+    flex-direction: column;
+    width: 260px;
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     position: sticky;
@@ -33,66 +31,116 @@
   }
 }
 
+// Search
 .sideSearch {
   display: flex; align-items: center; gap: 8px;
-  margin: 10px 10px 6px;
+  margin: 10px 10px 8px;
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 7px 10px; color: var(--text-3);
+  border-radius: var(--r-md); padding: 8px 10px; color: var(--text-3);
   transition: border-color 0.15s;
   &:focus-within { border-color: var(--accent); color: var(--accent); }
-  input { flex:1; background:none; border:none; outline:none; font-size:12px; color:var(--text); &::placeholder{color:var(--text-3);} }
+  input {
+    flex: 1; background: none; border: none; outline: none;
+    font-size: 12px; color: var(--text);
+    &::placeholder { color: var(--text-3); }
+  }
 }
-.clearBtn { background:none; border:none; color:var(--text-3); cursor:pointer; font-size:11px; padding:0; &:hover{color:var(--text);} }
+.clearBtn { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 11px; padding: 0; &:hover { color: var(--text); } }
 
-.sideGroup { padding-bottom:2px; margin-bottom:2px; }
+// Section header
+.sideGroup { border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 .sideGroupHead {
-  padding:12px 10px 5px;
-  font-family:var(--font-mono); font-size:9px; font-weight:500;
-  letter-spacing:0.18em; color:var(--text-3); text-transform:uppercase;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px 4px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.16em; color: var(--text-3); text-transform: uppercase;
 }
+
+// Live badge in sidebar header
+.sideliveBadge {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: var(--accent); font-weight: 700;
+  background: var(--accent-dim); padding: 2px 7px; border-radius: 3px;
+}
+.liveDotSmall {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent); animation: pulse 1.4s infinite; flex-shrink: 0;
+}
+
+// Sidebar competition row
 .sideRow {
-  display:flex; align-items:center; gap:9px;
-  width:100%; padding:6px 10px;
-  background:none; border:none; cursor:pointer; text-align:left;
-  border-left:2px solid transparent; text-decoration:none;
-  transition:background 0.1s, border-color 0.1s;
-  &:hover { background:rgba(57,255,20,0.04); border-left-color:var(--border-hi); }
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 7px 12px;
+  background: none; border: none; cursor: pointer; text-align: left;
+  border-left: 3px solid transparent; text-decoration: none;
+  transition: background 0.1s, border-color 0.1s;
+  &:hover { background: rgba(255,255,255,0.04); border-left-color: var(--border-hi); }
 }
-.sideRowActive { border-left-color:var(--accent) !important; background:var(--accent-dim) !important; .sideRowName{color:var(--accent) !important;} }
-.sideRowInfo { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-.sideRowName { font-size:12px; font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sideRowSub  { font-size:10px; color:var(--text-3); }
+.sideRowActive {
+  border-left-color: var(--accent) !important;
+  background: var(--accent-dim) !important;
+  .sideRowName { color: var(--accent) !important; }
+}
+.sideRowInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sideRowName { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sideRowSub  { font-size: 10px; color: var(--text-3); }
+
+// ── Playing Today compact list ─────────────────────────────────────────────
+.todaySkel { padding: 4px 10px; }
+.todaySkelRow { height: 40px; background: var(--bg-card-hi); border-radius: 6px; margin-bottom: 3px; animation: shimmer 1.4s infinite; }
+
+.todayLeaguePills {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  padding: 6px 10px 4px;
+}
+.todayLeaguePill {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 1px solid var(--border); background: transparent;
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+  &:hover { border-color: var(--accent); }
+}
+.todayLeaguePillActive { background: var(--accent-dim) !important; border-color: var(--accent) !important; }
+.todayLeaguePillAll {
+  width: auto !important; padding: 0 10px;
+  border-radius: 20px !important;
+  font-size: 10px; font-weight: 600; color: var(--text-3);
+  &.todayLeaguePillActive { color: var(--accent) !important; }
+}
+
+.todayList { display: flex; flex-direction: column; }
+.todayRow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer; text-decoration: none; transition: background 0.12s; gap: 8px;
+  &:hover { background: rgba(255,255,255,0.04); }
+  &:last-child { border-bottom: none; }
+}
+.todayTeams     { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.todayTeam      { display: flex; align-items: center; gap: 5px; }
+.todayTeamName  { font-size: 11px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.todayScore     { display: flex; align-items: center; flex-shrink: 0; }
+.todayLive      { display: flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.todayFt        { font-size: 12px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.todayTime      { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+.todayMore      { padding: 7px 12px; font-size: 10px; color: var(--text-3); text-align: center; font-family: var(--font-mono); letter-spacing: 0.04em; border-top: 1px solid var(--border); }
 
 // ══ MAIN ══════════════════════════════════════════════════════════════════════
-.main {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
-}
+.main { flex: 1; min-width: 0; width: 100%; }
 
 // ─── Date bar — livescore style ───────────────────────────────────────────────
 .datebar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 10px;
-  height: 48px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 54px;
-  z-index: 50;
-  width: 100%;
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 12px; height: 50px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  position: sticky; top: 54px; z-index: 50; width: 100%;
 
-  @media (max-width: 760px) {
-    padding: 0 8px;
-    gap: 2px;
-  }
+  @media (max-width: 760px) { padding: 0 8px; }
 }
 
 .liveBtn {
-  display: flex; align-items: center; gap: 4px;
-  padding: 5px 9px; background: none;
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 10px; background: none;
   border: 1px solid var(--border-hi); border-radius: 99px;
   cursor: pointer; font-size: 10px; font-weight: 700;
   font-family: var(--font-mono); color: var(--text-3);
@@ -101,51 +149,39 @@
   &:hover { border-color: var(--accent); color: var(--accent); }
 }
 .liveBtnActive { background: rgba(57,255,20,0.08) !important; border-color: var(--accent) !important; color: var(--accent) !important; }
-.liveDot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: pulse 1.3s infinite; flex-shrink: 0; }
-.liveBadge { background: var(--accent); color: #000; font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 3px; }
+.liveDot   { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.3s infinite; flex-shrink: 0; }
+.liveBadge { background: var(--accent); color: #000; font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 3px; margin-left: 1px; }
 
 .dateArrow {
   background: none; border: none;
-  width: 32px; height: 32px;
+  width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; color: var(--text-2); flex-shrink: 0;
-  border-radius: 50%;
-  transition: all 0.15s;
+  border-radius: 50%; transition: all 0.15s;
   &:hover:not(:disabled) { background: rgba(255,255,255,0.06); color: var(--text); }
   &:disabled { opacity: 0.2; cursor: default; }
 }
 
-// Date tabs — centered, livescore style
 .dateTabs {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  gap: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex: 1; display: flex; justify-content: center; gap: 2px;
+  overflow-x: auto; scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
 }
-
 .dateTab {
-  padding: 5px 14px; border-radius: 99px;
+  padding: 6px 16px; border-radius: 99px;
   border: none; background: none;
   font-size: 13px; font-weight: 500; color: var(--text-2);
   cursor: pointer; white-space: nowrap; transition: all 0.15s;
   &:hover { color: var(--text); }
-
-  @media (max-width: 400px) { padding: 4px 10px; font-size: 12px; }
+  @media (max-width: 400px) { padding: 5px 10px; font-size: 12px; }
 }
-.dateTabActive {
-  background: var(--accent) !important;
-  color: #000 !important;
-  font-weight: 700;
-}
+.dateTabActive { background: var(--accent) !important; color: #000 !important; font-weight: 700; }
 
 .calWrap { position: relative; flex-shrink: 0; }
 .calBtn {
   display: flex; align-items: center; justify-content: center;
   background: none; border: 1px solid var(--border);
-  border-radius: 8px; width: 32px; height: 32px;
+  border-radius: 8px; width: 34px; height: 34px;
   cursor: pointer; color: var(--text-3); transition: all 0.15s;
   &:hover { border-color: var(--border-hi); color: var(--text); }
 }
@@ -154,162 +190,171 @@
   position: absolute; top: calc(100% + 8px); right: 0;
   background: var(--bg-card); border: 1px solid var(--border-hi);
   border-radius: var(--r-xl); padding: 14px; z-index: 200;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.8);
-  min-width: 220px; animation: fadeUp 0.15s var(--ease);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.8); min-width: 220px;
+  animation: fadeUp 0.15s var(--ease);
   @media (max-width: 400px) { right: -40px; }
 }
-.calHead { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.calMonth { font-size:13px; font-weight:600; color:var(--text); font-family:var(--font-display); letter-spacing:0.05em; }
-.calArrow { background:none; border:none; cursor:pointer; font-size:18px; color:var(--text-2); padding:0 4px; &:hover{color:var(--text);} }
-.calGrid  { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
-.calWeekday { font-size:9px; font-family:var(--font-mono); color:var(--text-3); text-align:center; padding:2px 0 8px; letter-spacing:0.06em; }
+.calHead    { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.calMonth   { font-size: 13px; font-weight: 600; color: var(--text); font-family: var(--font-display); letter-spacing: 0.05em; }
+.calArrow   { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--text-2); padding: 0 4px; &:hover { color: var(--text); } }
+.calGrid    { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.calWeekday { font-size: 9px; font-family: var(--font-mono); color: var(--text-3); text-align: center; padding: 2px 0 8px; letter-spacing: 0.06em; }
 .calDay {
-  background:none; border:none; cursor:pointer; font-size:12px;
-  color:var(--text-2); padding:6px 2px; border-radius:var(--r-sm);
-  text-align:center; transition:all 0.1s;
-  &:hover { background:rgba(255,255,255,0.06); color:var(--text); }
+  background: none; border: none; cursor: pointer; font-size: 12px;
+  color: var(--text-2); padding: 6px 2px; border-radius: var(--r-sm);
+  text-align: center; transition: all 0.1s;
+  &:hover { background: rgba(255,255,255,0.06); color: var(--text); }
 }
-.calToday    { color:var(--accent) !important; font-weight:700; }
-.calSelected { background:var(--accent) !important; color:#000 !important; font-weight:700; }
+.calToday    { color: var(--accent) !important; font-weight: 700; }
+.calSelected { background: var(--accent) !important; color: #000 !important; font-weight: 700; }
 
 // ─── Filter pill ──────────────────────────────────────────────────────────────
 .filterPill {
-  display:flex; align-items:center; gap:8px;
-  padding:6px 12px; background:var(--accent-dim);
-  border-bottom:1px solid var(--accent-mid);
-  font-size:11px; font-weight:600; color:var(--accent);
-  button{background:none; border:none; color:var(--accent); cursor:pointer; margin-left:auto; font-size:12px; opacity:0.7; &:hover{opacity:1;}}
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px; background: var(--accent-dim);
+  border-bottom: 1px solid var(--accent-mid);
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  button { background: none; border: none; color: var(--accent); cursor: pointer; margin-left: auto; font-size: 13px; opacity: 0.7; &:hover { opacity: 1; } }
 }
 
 // ─── Count bar ────────────────────────────────────────────────────────────────
-.countBar {
-  display:flex; align-items:center; gap:10px;
-  padding:6px 12px; border-bottom:1px solid var(--border);
-}
-.countLabel { font-size:13px; font-weight:600; color:var(--text); font-family:var(--font-display); letter-spacing:0.04em; }
-.countNum   { font-size:11px; color:var(--text-3); font-family:var(--font-mono); }
+.countBar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; border-bottom: 1px solid var(--border); }
+.countLabel { font-size: 14px; font-weight: 700; color: var(--text); font-family: var(--font-display); letter-spacing: 0.04em; }
+.countNum   { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
 .countLive  {
-  display:flex; align-items:center; gap:5px;
-  font-size:10px; font-weight:600; color:var(--accent);
-  font-family:var(--font-mono); background:var(--accent-dim);
-  padding:2px 8px; border-radius:3px; letter-spacing:0.04em;
+  display: flex; align-items: center; gap: 5px; margin-left: auto;
+  font-size: 10px; font-weight: 700; color: var(--accent);
+  font-family: var(--font-mono); background: var(--accent-dim);
+  padding: 2px 8px; border-radius: 3px; letter-spacing: 0.04em;
 }
 
-// ─── League group ─────────────────────────────────────────────────────────────
-.leagueGroup { border-bottom:1px solid var(--border); &:last-child{border-bottom:none;} }
+// ─── League group — livescore style ───────────────────────────────────────────
+.leagueGroup {
+  border-bottom: 1px solid var(--border);
+  &:last-child { border-bottom: none; }
+}
 
 .leagueHead {
-  display:flex; align-items:center; gap:9px;
-  padding:8px 12px; background:var(--bg-1);
-  border-bottom:1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+  position: sticky;
+  top: 104px; // below datebar
+  z-index: 10;
 }
-.leagueInfo { flex:1; min-width:0; }
-.leagueName    { display:block; font-size:11px; font-weight:600; color:var(--text); font-family:var(--font-display); letter-spacing:0.04em; text-transform:uppercase; }
-.leagueCountry { display:block; font-size:9px; color:var(--text-3); margin-top:1px; font-family:var(--font-mono); }
-.leagueCount {
-  font-size:9px; font-family:var(--font-mono); color:var(--text-3);
-  background:var(--bg-card); border:1px solid var(--border);
-  padding:2px 6px; border-radius:3px; letter-spacing:0.06em;
+.leagueInfo    { flex: 1; min-width: 0; }
+.leagueName    {
+  display: block; font-size: 12px; font-weight: 700; color: var(--text);
+  font-family: var(--font-display); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.leagueCountry { display: block; font-size: 10px; color: var(--text-3); margin-top: 1px; font-family: var(--font-mono); }
+.leagueCount   {
+  font-size: 10px; font-family: var(--font-mono); color: var(--text-3);
+  background: var(--bg-card); border: 1px solid var(--border);
+  padding: 2px 7px; border-radius: 3px; letter-spacing: 0.04em; flex-shrink: 0;
 }
 
-// ─── Match row ────────────────────────────────────────────────────────────────
-.matchList { display:flex; flex-direction:column; }
+// ─── Match row — livescore style ──────────────────────────────────────────────
+.matchList { display: flex; flex-direction: column; }
 
 .matchRow {
   display: grid;
-  grid-template-columns: 54px 1fr 30px 36px;
-  align-items: center;
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  min-height: 52px;
-  transition: background 0.08s;
+  grid-template-columns: 60px 1fr 36px 40px;
+  align-items: center; text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  min-height: 58px; transition: background 0.08s;
   &:last-child { border-bottom: none; }
-  &:hover { background: rgba(57,255,20,0.03); }
+  &:hover { background: rgba(255,255,255,0.03); }
 
-  @media (max-width: 360px) {
-    grid-template-columns: 48px 1fr 26px 32px;
-    min-height: 48px;
+  @media (max-width: 400px) {
+    grid-template-columns: 52px 1fr 30px 36px;
+    min-height: 52px;
   }
 }
 
 .matchTime {
-  display:flex; align-items:center; justify-content:center;
-  padding:0 4px; border-right:1px solid rgba(255,255,255,0.05); align-self:stretch;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 6px; border-right: 1px solid rgba(255,255,255,0.06);
+  align-self: stretch; flex-direction: column; gap: 3px;
 }
-.liveTag { font-size:9px; font-weight:700; font-family:var(--font-mono); color:#000; background:var(--accent); padding:2px 4px; border-radius:2px; letter-spacing:0.04em; }
-.htTag   { font-size:9px; font-weight:700; font-family:var(--font-mono); color:#000; background:var(--yellow); padding:2px 4px; border-radius:2px; }
-.ftTag   { font-size:10px; font-weight:500; font-family:var(--font-mono); color:var(--text-3); }
-.nsTime  { font-size:12px; font-weight:600; font-family:var(--font-mono); color:var(--text-2); }
-.otherStatus { font-size:9px; font-family:var(--font-mono); color:var(--text-3); background:var(--bg-card); padding:2px 3px; border-radius:2px; }
-
-.matchTeams { padding:8px 10px; display:flex; flex-direction:column; gap:6px; min-width:0; }
-.teamLine   { display:flex; align-items:center; gap:7px; }
-.teamName   { font-size:13px; font-weight:500; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  @media (max-width: 360px) { font-size: 12px; }
+.liveTag {
+  font-size: 9px; font-weight: 800; font-family: var(--font-mono);
+  color: #000; background: var(--accent); padding: 2px 5px;
+  border-radius: 2px; letter-spacing: 0.04em;
+  animation: livePulse 2s infinite;
 }
-.teamWinner { color:var(--text) !important; font-weight:600; }
+.htTag      { font-size: 9px; font-weight: 700; font-family: var(--font-mono); color: #000; background: var(--yellow, #f5c518); padding: 2px 5px; border-radius: 2px; }
+.ftTag      { font-size: 10px; font-weight: 500; font-family: var(--font-mono); color: var(--text-3); }
+.nsTime     { font-size: 13px; font-weight: 600; font-family: var(--font-mono); color: var(--text-2); }
+.otherStatus { font-size: 9px; font-family: var(--font-mono); color: var(--text-3); background: var(--bg-card); padding: 2px 4px; border-radius: 2px; text-align: center; }
 
-.matchScore { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:8px 4px; }
-.scoreNum  { font-size:13px; font-weight:700; font-family:var(--font-mono); color:var(--text-3); line-height:1; }
-.scoreWin  { color:var(--text) !important; }
-.scoreDash { font-size:10px; color:var(--text-3); font-family:var(--font-mono); }
+.matchTeams { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.teamLine   { display: flex; align-items: center; gap: 8px; }
+.teamName   {
+  font-size: 13px; font-weight: 500; color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  @media (max-width: 400px) { font-size: 12px; }
+}
+.teamWinner { color: var(--text) !important; font-weight: 700; }
+
+.matchScore {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 7px; padding: 10px 4px;
+}
+.scoreNum  { font-size: 14px; font-weight: 700; font-family: var(--font-mono); color: var(--text-3); line-height: 1; }
+.scoreWin  { color: var(--text) !important; }
+.scoreDash { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
 
 .starBtn {
-  display:flex; align-items:center; justify-content:center;
-  background:none; border:none; cursor:pointer; color:var(--text-3);
-  border-left:1px solid rgba(255,255,255,0.04); align-self:stretch;
-  transition:color 0.15s; &:hover{color:var(--accent);}
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer; color: var(--text-3);
+  border-left: 1px solid rgba(255,255,255,0.05); align-self: stretch;
+  transition: color 0.15s;
+  &:hover { color: var(--accent); }
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-.skeletons { display:flex; flex-direction:column; }
-.skelGroup { border-bottom:1px solid var(--border); }
+// ─── Skeleton loading ─────────────────────────────────────────────────────────
+.skeletons { display: flex; flex-direction: column; }
+.skelGroup { border-bottom: 1px solid var(--border); }
 .skelGroupHead {
-  height:38px;
-  background:linear-gradient(90deg,var(--bg-1) 25%,rgba(255,255,255,0.025) 50%,var(--bg-1) 75%);
-  background-size:200% 100%; animation:shimmer 1.5s infinite;
+  height: 40px;
+  background: linear-gradient(90deg, var(--bg-1) 25%, rgba(255,255,255,0.03) 50%, var(--bg-1) 75%);
+  background-size: 200% 100%; animation: shimmer 1.5s infinite;
 }
 .skelRow {
-  height:52px; border-bottom:1px solid rgba(255,255,255,0.03);
-  background:linear-gradient(90deg,var(--bg) 25%,rgba(255,255,255,0.02) 50%,var(--bg) 75%);
-  background-size:200% 100%; animation:shimmer 1.5s infinite;
+  height: 58px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  background: linear-gradient(90deg, var(--bg) 25%, rgba(255,255,255,0.02) 50%, var(--bg) 75%);
+  background-size: 200% 100%; animation: shimmer 1.5s infinite;
 }
 
-// ─── Empty ────────────────────────────────────────────────────────────────────
+// ─── Empty state ──────────────────────────────────────────────────────────────
 .empty {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  padding:60px 20px; text-align:center; gap:10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 70px 20px; text-align: center; gap: 12px;
 }
-.emptyIcon  { font-size:36px; opacity:0.3; }
-.emptyTitle { font-family:var(--font-display); font-size:22px; letter-spacing:0.08em; color:var(--text); margin:0; }
-.emptyText  { font-size:13px; color:var(--text-3); max-width:280px; line-height:1.65; margin:0; }
+.emptyIcon  { font-size: 40px; opacity: 0.25; }
+.emptyTitle { font-family: var(--font-display); font-size: 22px; letter-spacing: 0.08em; color: var(--text); margin: 0; }
+.emptyText  { font-size: 13px; color: var(--text-3); max-width: 280px; line-height: 1.7; margin: 0; }
 .emptyBtn {
-  margin-top:8px; padding:9px 20px; background:var(--accent); color:#000;
-  border:none; border-radius:var(--r-md); font-weight:700; font-size:13px;
-  cursor:pointer; transition:opacity 0.15s; &:hover{opacity:0.85;}
+  margin-top: 8px; padding: 10px 22px; background: var(--accent); color: #000;
+  border: none; border-radius: var(--r-md); font-weight: 700; font-size: 13px;
+  cursor: pointer; transition: opacity 0.15s; &:hover { opacity: 0.85; }
 }
 
-@keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.25} }
-@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-@keyframes fadeUp  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-
-// ─── Pagination ────────────────────────────────────────────────────────────────
-.pagination {
-  display:flex; align-items:center; justify-content:center;
-  gap:12px; padding:20px 12px;
-  border-top:1px solid var(--border); font-family:var(--font-mono);
-}
-
+// ─── Pagination ───────────────────────────────────────────────────────────────
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px 12px; border-top: 1px solid var(--border); font-family: var(--font-mono); }
 .pageBtn {
-  padding:8px 16px; border:1px solid var(--border-hi);
-  background:var(--bg-1); border-radius:var(--r-md);
-  color:var(--text-2); font-size:12px; font-weight:500;
-  cursor:pointer; transition:all 0.15s;
-  &:hover:not(:disabled) { border-color:var(--accent); background:var(--accent-dim); color:var(--accent); }
-  &:disabled { opacity:0.3; cursor:not-allowed; }
+  padding: 8px 16px; border: 1px solid var(--border-hi); background: var(--bg-1); border-radius: var(--r-md);
+  color: var(--text-2); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  &:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+  &:disabled { opacity: 0.3; cursor: not-allowed; }
 }
+.pageInfo { font-size: 11px; color: var(--text-3); font-weight: 500; letter-spacing: 0.06em; white-space: nowrap; }
 
-.pageInfo {
-  font-size:11px; color:var(--text-3); font-weight:500;
-  letter-spacing:0.06em; white-space:nowrap;
-}
+// ─── Animations ───────────────────────────────────────────────────────────────
+@keyframes pulse    { 0%, 100% { opacity: 1 } 50% { opacity: 0.25 } }
+@keyframes livePulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.7 } }
+@keyframes shimmer  { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+@keyframes fadeUp   { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }

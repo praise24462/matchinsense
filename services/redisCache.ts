@@ -1,14 +1,9 @@
-import { Redis } from "@upstash/redis";
+// Redis removed — matches are fetched live from APIs directly
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
-export async function getCached<T>(key: string): Promise<T | null> {
-  return await redis.get<T>(key);
+export async function getCached<T>(_key: string): Promise<T | null> {
+  return null;
 }
 
-export async function setCached(key: string, value: any, ttlSeconds = 3600) {
-  await redis.set(key, value, { ex: ttlSeconds });
+export async function setCached(_key: string, _value: any, _ttl?: number): Promise<void> {
+  // no-op
 }

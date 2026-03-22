@@ -1,24 +1,72 @@
 /**
  * /api/match/[id]
  *
- * Two-layer cached match detail (Next.js + memory).
- * 2 API calls on first load, then cached:
- *   Live/HT  → 60 sec
- *   Finished → 10 min
- *   Upcoming →  5 min
+ * Cached match detail — first user fetches, everyone else gets cache.
+ *
+ * TTL:
+ *   Live match   → 60s
+ *   Finished     → 10 min
+ *   Upcoming     → 5 min
+ *
+ * ID routing:
+ *   < 600,000  → football-data.org
+ *   >= 600,000 → api-football
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import type { MatchDetails, MatchStatistic, MatchEvent } from "@/types";
-import { withCache, ttlForStatus } from "@/services/apiCache";
-import { getCached, setCached } from "@/services/redisCache";
 
 const AS_BASE = "https://v3.football.api-sports.io";
+const FD_BASE = "https://api.football-data.org/v4";
 
-const STATUS_MAP: Record<string, string> = {
-  FT:"FT",AET:"FT",PEN:"FT",AWD:"FT",WO:"FT",
+// ── In-memory cache ───────────────────────────────────────────────────────
+interface CacheEntry { data: MatchDetails; expiresAt: number; }
+const memCache = new Map<string, CacheEntry>();
+
+function cacheGet(key: string): MatchDetails | null {
+  const entry = memCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) { memCache.delete(key); return null; }
+  return entry.data;
+}
+function cacheSet(key: string, data: MatchDetails, ttlMs: number) {
+  memCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+function getTtlForStatus(status: string): number {
+  if (status === "LIVE" || status === "HT") return 60 * 1000;
+  if (status === "FT") return 10 * 60 * 1000;
+  return 5 * 60 * 1000;
+}
+
+// ── In-flight dedup ───────────────────────────────────────────────────────
+const inFlight = new Map<string, Promise<MatchDetails>>();
+
+async function fetchWithDedup(key: string, fetcher: () => Promise<MatchDetails>): Promise<MatchDetails> {
+  if (inFlight.has(key)) return inFlight.get(key)!;
+  const promise = fetcher().finally(() => inFlight.delete(key));
+  inFlight.set(key, promise);
+  return promise;
+}
+
+// ── Status maps ───────────────────────────────────────────────────────────
+const AS_STATUS_MAP: Record<string, string> = {
+  FT:"FT", AET:"FT", PEN:"FT", AWD:"FT", WO:"FT",
   "1H":"LIVE","2H":"LIVE",ET:"LIVE",BT:"LIVE",P:"LIVE",LIVE:"LIVE",
-  HT:"HT", NS:"NS",TBD:"NS", PST:"PST",SUSP:"PST", CANC:"CANC",
+  HT:"HT", NS:"NS", TBD:"NS", PST:"PST", SUSP:"PST", CANC:"CANC",
+};
+const FD_STATUS_MAP: Record<string, string> = {
+  FINISHED:"FT", IN_PLAY:"LIVE", PAUSED:"HT",
+  SCHEDULED:"NS", TIMED:"NS", POSTPONED:"PST",
+  CANCELLED:"CANC", SUSPENDED:"PST",
+};
+
+const FD_LEAGUE_MAP: Record<string, { leagueId: number; name: string; country: string }> = {
+  PL:  { leagueId: 39,  name: "Premier League",   country: "England" },
+  PD:  { leagueId: 140, name: "La Liga",           country: "Spain"   },
+  SA:  { leagueId: 135, name: "Serie A",           country: "Italy"   },
+  BL1: { leagueId: 78,  name: "Bundesliga",        country: "Germany" },
+  FL1: { leagueId: 61,  name: "Ligue 1",           country: "France"  },
+  CL:  { leagueId: 2,   name: "Champions League",  country: "Europe"  },
+  EL:  { leagueId: 3,   name: "Europa League",     country: "Europe"  },
 };
 
 const STAT_LABELS: [string, string][] = [
@@ -31,109 +79,134 @@ const STAT_LABELS: [string, string][] = [
   ["passes %","Pass Accuracy"],["expected_goals","xG"],
 ];
 
+// ── football-data.org fetch ───────────────────────────────────────────────
+async function fetchFromFD(matchId: string, apiKey: string): Promise<MatchDetails> {
+  const res = await fetch(`${FD_BASE}/matches/${matchId}`, {
+    headers: { "X-Auth-Token": apiKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`FD ${res.status}`);
+  const m = await res.json();
+  if (!m?.homeTeam) throw new Error("Match not found");
+
+  const comp = m.competition?.code ?? "";
+  const league = FD_LEAGUE_MAP[comp] ?? {
+    leagueId: 0, name: m.competition?.name ?? "", country: m.area?.name ?? "",
+  };
+
+  return {
+    id:       m.id,
+    date:     m.utcDate,
+    status:   (FD_STATUS_MAP[m.status] ?? "NS") as MatchDetails["status"],
+    homeTeam: { id: m.homeTeam.id, name: m.homeTeam.shortName ?? m.homeTeam.name, logo: m.homeTeam.crest ?? "" },
+    awayTeam: { id: m.awayTeam.id, name: m.awayTeam.shortName ?? m.awayTeam.name, logo: m.awayTeam.crest ?? "" },
+    score:    { home: m.score?.fullTime?.home ?? null, away: m.score?.fullTime?.away ?? null },
+    halfTimeScore: { home: m.score?.halfTime?.home ?? null, away: m.score?.halfTime?.away ?? null },
+    league:   { id: league.leagueId, name: league.name, logo: "", country: league.country },
+    source:   "euro",
+    statistics: [],
+    events:     [],
+    venue:    m.venue ?? undefined,
+    referee:  m.referees?.[0]?.name ?? undefined,
+  };
+}
+
+// ── api-football fetch ────────────────────────────────────────────────────
+async function fetchFromAF(matchId: string, apiKey: string): Promise<MatchDetails> {
+  const [fixtureRes, statsRes] = await Promise.all([
+    fetch(`${AS_BASE}/fixtures?id=${matchId}`, {
+      headers: { "x-apisports-key": apiKey }, cache: "no-store",
+    }),
+    fetch(`${AS_BASE}/fixtures/statistics?fixture=${matchId}`, {
+      headers: { "x-apisports-key": apiKey }, cache: "no-store",
+    }),
+  ]);
+
+  if (!fixtureRes.ok) throw new Error(`AF ${fixtureRes.status}`);
+  const fd = await fixtureRes.json();
+  if (fd.errors && Object.keys(fd.errors).length > 0) throw new Error(JSON.stringify(fd.errors));
+
+  const f = fd.response?.[0];
+  if (!f) throw new Error("Match not found");
+
+  const events: MatchEvent[] = (f.events ?? []).map((e: any): MatchEvent | null => {
+    const team: "home"|"away" = e.team?.id === f.teams.home.id ? "home" : "away";
+    const minute = e.time?.elapsed ?? 0;
+    if (e.type === "Goal") {
+      if (e.detail === "Own Goal") return { minute, type:"OwnGoal", team: team==="home"?"away":"home", player: e.player?.name??"", detail:"Own Goal" };
+      if (e.detail === "Penalty") return { minute, type:"Penalty", team, player: e.player?.name??"", detail:"Penalty" };
+      return { minute, type:"Goal", team, player: e.player?.name??"", detail: e.assist?.name?`Assist: ${e.assist.name}`:undefined };
+    }
+    if (e.type === "Card") return { minute, type:"Card", team, player: e.player?.name??"", detail: e.detail==="Yellow Card"?"YELLOW":e.detail==="Red Card"?"RED":"YELLOW_RED" };
+    if (e.type === "subst") return { minute, type:"Substitution", team, player: e.player?.name??"", detail: e.assist?.name?`Off: ${e.assist.name}`:undefined };
+    return null;
+  }).filter(Boolean) as MatchEvent[];
+
+  let statistics: MatchStatistic[] = [];
+  if (statsRes.ok) {
+    const sd = await statsRes.json();
+    const sa = sd.response ?? [];
+    const hs: Record<string,any> = {}, as_: Record<string,any> = {};
+    for (const s of (sa[0]?.statistics ?? [])) hs[s.type] = s.value;
+    for (const s of (sa[1]?.statistics ?? [])) as_[s.type] = s.value;
+    statistics = STAT_LABELS
+      .filter(([k]) => hs[k] !== undefined || as_[k] !== undefined)
+      .map(([k, label]): MatchStatistic => ({ label, home: hs[k] ?? null, away: as_[k] ?? null }));
+  }
+
+  return {
+    id:        f.fixture.id,
+    date:      f.fixture.date,
+    status:    (AS_STATUS_MAP[f.fixture?.status?.short ?? "NS"] ?? "NS") as MatchDetails["status"],
+    homeTeam:  { id: f.teams.home.id, name: f.teams.home.name, logo: f.teams.home.logo ?? "" },
+    awayTeam:  { id: f.teams.away.id, name: f.teams.away.name, logo: f.teams.away.logo ?? "" },
+    score:     { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
+    halfTimeScore: { home: f.score?.halftime?.home ?? null, away: f.score?.halftime?.away ?? null },
+    league:    { id: f.league.id, name: f.league.name, logo: f.league.logo ?? "", country: f.league.country ?? "" },
+    source:    "euro",
+    statistics, events,
+    venue:    f.fixture?.venue?.name ?? undefined,
+    referee:  f.fixture?.referee ?? undefined,
+  };
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id: fixtureId } = await context.params;
-  if (!fixtureId || isNaN(Number(fixtureId)))
-    return NextResponse.json({ error: "Invalid match ID" }, { status: 400 });
+  const { id: matchId } = await context.params;
+  if (!matchId || isNaN(Number(matchId)))
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-  const apiKey = process.env.FOOTBALL_API_KEY ?? "";
-  if (!apiKey) return NextResponse.json({ error: "FOOTBALL_API_KEY not configured" }, { status: 500 });
+  const afKey = process.env.FOOTBALL_API_KEY ?? "";
+  const fdKey = process.env.FOOTBALL_DATA_API_KEY ?? "";
+  const cacheKey = `match:${matchId}`;
 
-  const fetcher = async (): Promise<MatchDetails> => {
-    const [fixtureRes, statsRes] = await Promise.all([
-      fetch(`${AS_BASE}/fixtures?id=${fixtureId}`, { headers: { "x-apisports-key": apiKey }, cache: "no-store" }),
-      fetch(`${AS_BASE}/fixtures/statistics?fixture=${fixtureId}`, { headers: { "x-apisports-key": apiKey }, cache: "no-store" }),
-    ]);
-
-    if (!fixtureRes.ok) throw new Error(`fixture fetch ${fixtureRes.status}`);
-    const fixtureData = await fixtureRes.json();
-    if (fixtureData.errors && Object.keys(fixtureData.errors).length > 0)
-      throw new Error(JSON.stringify(fixtureData.errors));
-
-    const fixture = fixtureData.response?.[0];
-    if (!fixture) throw new Error("Match not found");
-
-    // Events
-    const events: MatchEvent[] = (fixture.events ?? []).map((e: any): MatchEvent | null => {
-      const team: "home"|"away" = e.team?.id === fixture.teams.home.id ? "home" : "away";
-      const minute = e.time?.elapsed ?? 0;
-      if (e.type === "Goal") {
-        if (e.detail === "Own Goal") return { minute, type:"OwnGoal", team: team==="home"?"away":"home", player: e.player?.name??"", detail:"Own Goal" };
-        if (e.detail === "Penalty") return { minute, type:"Penalty", team, player: e.player?.name??"", detail:"Penalty" };
-        return { minute, type:"Goal", team, player: e.player?.name??"", detail: e.assist?.name?`Assist: ${e.assist.name}`:undefined };
-      }
-      if (e.type === "Card") {
-        const cardType = e.detail==="Yellow Card"?"YELLOW":e.detail==="Red Card"?"RED":"YELLOW_RED";
-        return { minute, type:"Card", team, player: e.player?.name??"", detail: cardType };
-      }
-      if (e.type === "subst")
-        return { minute, type:"Substitution", team, player: e.player?.name??"", detail: e.assist?.name?`Off: ${e.assist.name}`:undefined };
-      return null;
-    }).filter(Boolean) as MatchEvent[];
-
-    // Stats
-    let statistics: MatchStatistic[] = [];
-    if (statsRes.ok) {
-      const statsData = await statsRes.json();
-      const sa = statsData.response ?? [];
-      const hs: Record<string,any> = {};
-      const as_: Record<string,any> = {};
-      for (const s of (sa[0]?.statistics??[])) hs[s.type] = s.value;
-      for (const s of (sa[1]?.statistics??[])) as_[s.type] = s.value;
-      statistics = STAT_LABELS
-        .filter(([k]) => hs[k]!==undefined || as_[k]!==undefined)
-        .map(([k,label]): MatchStatistic => ({ label, home: hs[k]??null, away: as_[k]??null }));
-    }
-
-    const statusShort = fixture.fixture?.status?.short ?? "NS";
-    return {
-      id: fixture.fixture.id, date: fixture.fixture.date,
-      status: (STATUS_MAP[statusShort]??"NS") as MatchDetails["status"],
-      homeTeam: { id: fixture.teams.home.id, name: fixture.teams.home.name, logo: fixture.teams.home.logo??"" },
-      awayTeam: { id: fixture.teams.away.id, name: fixture.teams.away.name, logo: fixture.teams.away.logo??"" },
-      score: { home: fixture.goals?.home??null, away: fixture.goals?.away??null },
-      halfTimeScore: { home: fixture.score?.halftime?.home??null, away: fixture.score?.halftime?.away??null },
-      league: { id: fixture.league.id, name: fixture.league.name, logo: fixture.league.logo??"", country: fixture.league.country??"" },
-      source: "euro",
-      statistics, events,
-      venue: fixture.fixture?.venue?.name??undefined,
-      referee: fixture.fixture?.referee??undefined,
-    };
-  };
+  // ── Serve from cache ────────────────────────────────────────────────────
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+  }
 
   try {
-    // Try Redis first (persistent cache across server restarts)
-    const redisCacheKey = `match:${fixtureId}`;
-    const redisData = await getCached(redisCacheKey);
-    if (redisData) {
-      return NextResponse.json(redisData, { headers: { "X-Cache": "REDIS" } });
-    }
+    const isFdMatch = Number(matchId) < 600000;
 
-    // Peek at status from a quick memory check first — if cached, TTL is already set
-    // Otherwise use a safe default; fetcher sets real TTL after it knows the status
-    const { data: match, hit } = await withCache<MatchDetails>(
-      `match:${fixtureId}`,
-      fetcher,
-      5 * 60 * 1000, // default 5 min; real TTL set per-status after first fetch
+    const match = await fetchWithDedup(cacheKey, () =>
+      isFdMatch && fdKey
+        ? fetchFromFD(matchId, fdKey)
+        : fetchFromAF(matchId, afKey)
     );
 
-    // Cache to Redis with appropriate TTL based on status
-    try {
-      const ttl = ttlForStatus(match.status) / 1000; // convert ms to seconds
-      await setCached(redisCacheKey, match, ttl);
-    } catch (redisErr) {
-      console.warn("[match detail] Redis cache failed (non-blocking):", redisErr);
-    }
+    // Cache with status-aware TTL
+    cacheSet(cacheKey, match, getTtlForStatus(match.status));
 
-    // Re-cache with correct TTL based on actual status
-    return NextResponse.json(match, { headers: { "X-Cache": hit.toUpperCase() } });
+    return NextResponse.json(match, { headers: { "X-Cache": "MISS" } });
 
   } catch (err: any) {
-    console.error("match/[id] error:", err.message);
-    if (err.message === "Match not found") return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    console.error(`[match/${matchId}]`, err.message);
+    if (err.message === "Match not found")
+      return NextResponse.json({ error: "Match not found" }, { status: 404 });
     return NextResponse.json({ error: "Failed to load match" }, { status: 500 });
   }
 }

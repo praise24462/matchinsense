@@ -1,25 +1,49 @@
 /**
- * /api/team/[id]
+ * /api/team/[id]?type=results|upcoming&source=euro|africa|af|fd
  *
- * Free plan compatible: fetches team fixtures within the 3-day window only.
- * For results: yesterday + today. For fixtures: today + tomorrow.
+ * source=af  → api-football (all popular teams from popularTeams.ts)
+ * source=fd  → football-data.org (teams from FD matches)
+ * source=euro/africa → api-football (legacy)
+ * no source  → detect by ID: if team found in popular teams list, use AF
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
-import { withCache, TTL } from "@/services/apiCache";
 
 const AS_BASE = "https://v3.football.api-sports.io";
+const FD_BASE = "https://api.football-data.org/v4";
 
-const STATUS_MAP: Record<string,string> = {
-  FT:"FT",AET:"FT",PEN:"FT",AWD:"FT",WO:"FT",
+const memCache = new Map<string, { data: any; expiresAt: number }>();
+function cacheGet(key: string) {
+  const e = memCache.get(key);
+  if (!e || Date.now() > e.expiresAt) { memCache.delete(key); return null; }
+  return e.data;
+}
+function cacheSet(key: string, data: any, ttlMs: number) {
+  memCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+
+const AS_STATUS_MAP: Record<string, string> = {
+  FT:"FT", AET:"FT", PEN:"FT", AWD:"FT", WO:"FT",
   "1H":"LIVE","2H":"LIVE",ET:"LIVE",BT:"LIVE",P:"LIVE",LIVE:"LIVE",
-  HT:"HT", NS:"NS",TBD:"NS", PST:"PST",SUSP:"PST", CANC:"CANC",
+  HT:"HT", NS:"NS", TBD:"NS", PST:"PST", SUSP:"PST", CANC:"CANC",
 };
 
-const FINISHED = new Set(["FT","AET","PEN","AWD","WO"]);
-const UPCOMING = new Set(["NS","TBD"]);
-const LIVE_SET  = new Set(["1H","2H","HT","ET","BT","P","LIVE"]);
+const FD_STATUS_MAP: Record<string, string> = {
+  FINISHED:"FT", IN_PLAY:"LIVE", PAUSED:"HT",
+  SCHEDULED:"NS", TIMED:"NS", POSTPONED:"PST",
+  CANCELLED:"CANC", SUSPENDED:"PST",
+};
+
+const FD_LEAGUE_MAP: Record<string, { leagueId: number; name: string; country: string; logo: string }> = {
+  PL:  { leagueId: 39,  name: "Premier League",   country: "England", logo: "https://media.api-sports.io/football/leagues/39.png"  },
+  PD:  { leagueId: 140, name: "La Liga",           country: "Spain",   logo: "https://media.api-sports.io/football/leagues/140.png" },
+  SA:  { leagueId: 135, name: "Serie A",           country: "Italy",   logo: "https://media.api-sports.io/football/leagues/135.png" },
+  BL1: { leagueId: 78,  name: "Bundesliga",        country: "Germany", logo: "https://media.api-sports.io/football/leagues/78.png"  },
+  FL1: { leagueId: 61,  name: "Ligue 1",           country: "France",  logo: "https://media.api-sports.io/football/leagues/61.png"  },
+  CL:  { leagueId: 2,   name: "Champions League",  country: "Europe",  logo: "https://media.api-sports.io/football/leagues/2.png"   },
+  EL:  { leagueId: 3,   name: "Europa League",     country: "Europe",  logo: "https://media.api-sports.io/football/leagues/3.png"   },
+};
 
 function utcDateOffset(offset: number): string {
   const d = new Date();
@@ -27,69 +51,176 @@ function utcDateOffset(offset: number): string {
   return d.toISOString().split("T")[0];
 }
 
+// ── api-football: full season fixtures for a team ─────────────────────────
+async function fetchAfTeam(teamId: string, type: string, apiKey: string) {
+  const now = new Date();
+  const season = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+
+  // Get team info + fixtures in parallel
+  const [teamRes, fixturesRes] = await Promise.all([
+    fetch(`${AS_BASE}/teams?id=${teamId}`, {
+      headers: { "x-apisports-key": apiKey }, cache: "no-store",
+    }),
+    fetch(`${AS_BASE}/fixtures?team=${teamId}&season=${season}`, {
+      headers: { "x-apisports-key": apiKey }, cache: "no-store",
+    }),
+  ]);
+
+  // Team info
+  let teamInfo = null;
+  if (teamRes.ok) {
+    const td = await teamRes.json();
+    const t = td.response?.[0];
+    if (t) teamInfo = {
+      id: t.team.id, name: t.team.name, logo: t.team.logo ?? "",
+      country: t.team.country ?? "", founded: t.team.founded ?? 0,
+      leagueId: 39, // will be overridden from fixtures
+    };
+  }
+
+  // Fixtures
+  let matches: Match[] = [];
+  if (fixturesRes.ok) {
+    const fd = await fixturesRes.json();
+    const all = fd.response ?? [];
+    const nowMs = Date.now();
+
+    // Detect primary league from most common league in fixtures
+    const leagueCounts: Record<number, number> = {};
+    for (const f of all) {
+      const lid = f.league?.id;
+      if (lid) leagueCounts[lid] = (leagueCounts[lid] ?? 0) + 1;
+    }
+    const primaryLeagueId = Object.entries(leagueCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (primaryLeagueId && teamInfo) teamInfo.leagueId = Number(primaryLeagueId);
+
+    const filtered = all
+      .filter((f: any) => {
+        const t = new Date(f.fixture.date).getTime();
+        const s = f.fixture.status?.short ?? "";
+        const DONE = new Set(["FT","AET","PEN","AWD","WO"]);
+        const COMING = new Set(["NS","TBD"]);
+        return type === "upcoming" ? COMING.has(s) && t >= nowMs : DONE.has(s) && t < nowMs;
+      })
+      .sort((a: any, b: any) => {
+        const at = new Date(a.fixture.date).getTime();
+        const bt = new Date(b.fixture.date).getTime();
+        return type === "upcoming" ? at - bt : bt - at;
+      })
+      .slice(0, type === "upcoming" ? 5 : 10);
+
+    matches = filtered.map((f: any): Match => ({
+      id:       f.fixture.id,
+      date:     f.fixture.date,
+      status:   (AS_STATUS_MAP[f.fixture.status?.short ?? "NS"] ?? "NS") as Match["status"],
+      homeTeam: { id: f.teams.home.id, name: f.teams.home.name, logo: f.teams.home.logo ?? "" },
+      awayTeam: { id: f.teams.away.id, name: f.teams.away.name, logo: f.teams.away.logo ?? "" },
+      score:    { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
+      league:   { id: f.league.id, name: f.league.name, logo: f.league.logo ?? "", country: f.league.country ?? "" },
+      source:   "euro",
+    }));
+  }
+
+  return { matches, teamInfo, type };
+}
+
+// ── football-data.org: for teams from FD matches ──────────────────────────
+async function fetchFdTeam(teamId: string, type: string, apiKey: string) {
+  const now = new Date();
+  const season = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+
+  const [teamRes, matchesRes] = await Promise.all([
+    fetch(`${FD_BASE}/teams/${teamId}`, {
+      headers: { "X-Auth-Token": apiKey }, cache: "no-store",
+    }),
+    fetch(`${FD_BASE}/teams/${teamId}/matches?season=${season}&limit=20`, {
+      headers: { "X-Auth-Token": apiKey }, cache: "no-store",
+    }),
+  ]);
+
+  let teamInfo = null;
+  if (teamRes.ok) {
+    const td = await teamRes.json();
+    const compCode = td.runningCompetitions?.[0]?.code ?? "PL";
+    const league = FD_LEAGUE_MAP[compCode] ?? FD_LEAGUE_MAP["PL"];
+    teamInfo = {
+      id: td.id, name: td.name, logo: td.crest ?? "",
+      country: td.area?.name ?? "", founded: td.founded ?? 0,
+      leagueId: league.leagueId,
+    };
+  }
+
+  let matches: Match[] = [];
+  if (matchesRes.ok) {
+    const md = await matchesRes.json();
+    const all = md.matches ?? [];
+    const nowMs = Date.now();
+
+    matches = all
+      .filter((m: any) => {
+        const t = new Date(m.utcDate).getTime();
+        return type === "upcoming" ? t >= nowMs : t < nowMs && m.status === "FINISHED";
+      })
+      .sort((a: any, b: any) => {
+        const at = new Date(a.utcDate).getTime();
+        const bt = new Date(b.utcDate).getTime();
+        return type === "upcoming" ? at - bt : bt - at;
+      })
+      .slice(0, type === "upcoming" ? 5 : 10)
+      .map((m: any): Match => {
+        const comp = m.competition?.code ?? "";
+        const league = FD_LEAGUE_MAP[comp] ?? { leagueId: 0, name: m.competition?.name ?? "", country: "", logo: "" };
+        return {
+          id: m.id, date: m.utcDate,
+          status: (FD_STATUS_MAP[m.status] ?? "NS") as Match["status"],
+          homeTeam: { id: m.homeTeam.id, name: m.homeTeam.shortName ?? m.homeTeam.name, logo: m.homeTeam.crest ?? "" },
+          awayTeam: { id: m.awayTeam.id, name: m.awayTeam.shortName ?? m.awayTeam.name, logo: m.awayTeam.crest ?? "" },
+          score: { home: m.score?.fullTime?.home ?? null, away: m.score?.fullTime?.away ?? null },
+          league: { id: league.leagueId, name: league.name, logo: league.logo, country: league.country },
+          source: "euro",
+        };
+      });
+  }
+
+  return { matches, teamInfo, type };
+}
+
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{id:string}>|{id:string} }
+  context: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const apiKey = process.env.FOOTBALL_API_KEY ?? "";
-  if (!apiKey) return NextResponse.json({ message:"FOOTBALL_API_KEY not configured" }, { status:500 });
+  const p = await Promise.resolve(context.params);
+  const id = p.id;
+  const url = new URL(req.url);
+  const type   = url.searchParams.get("type")   ?? "results";
+  const source = url.searchParams.get("source") ?? "";
 
-  const p    = await Promise.resolve(context.params);
-  const asId = parseInt(p.id, 10);
-  if (isNaN(asId)) return NextResponse.json({ message:"Invalid team ID" }, { status:400 });
+  if (!id || isNaN(Number(id)))
+    return NextResponse.json({ message: "Invalid team ID" }, { status: 400 });
 
-  const url    = new URL(req.url);
-  const type   = url.searchParams.get("type") ?? "results";
+  const afKey = process.env.FOOTBALL_API_KEY ?? "";
+  const fdKey = process.env.FOOTBALL_DATA_API_KEY ?? "";
+  const today = utcDateOffset(0);
+  const cacheKey = `team:${id}:${type}:${source}:${today}`;
 
-  // Free plan: only 3-day window (yesterday → tomorrow)
-  const yesterday = utcDateOffset(-1);
-  const today     = utcDateOffset(0);
-  const tomorrow  = utcDateOffset(1);
+  const cached = cacheGet(cacheKey);
+  if (cached) return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
 
-  // For results: fetch yesterday + today. For upcoming: fetch today + tomorrow.
-  const from = type === "upcoming" ? today     : yesterday;
-  const to   = type === "upcoming" ? tomorrow  : today;
-
-  const cacheKey = `team:${asId}:${type}:${today}`;
-
-  const fetcher = async () => {
-    const res = await fetch(
-      `${AS_BASE}/fixtures?team=${asId}&from=${from}&to=${to}`,
-      { headers:{"x-apisports-key":apiKey}, cache:"no-store" }
-    );
-    if (!res.ok) throw new Error(`api-sports ${res.status}`);
-    const data     = await res.json();
-    const fixtures = data.response ?? [];
-
-    const statusSet = type === "upcoming" ? UPCOMING : FINISHED;
-    // For results also include live matches
-    const matches: Match[] = fixtures
-      .filter((f:any) => {
-        const s = f.fixture?.status?.short ?? "";
-        return statusSet.has(s) || (type === "results" && LIVE_SET.has(s));
-      })
-      .map((f:any): Match => ({
-        id: f.fixture.id, date: f.fixture.date,
-        status: (STATUS_MAP[f.fixture?.status?.short??"NS"]??"NS") as Match["status"],
-        homeTeam: { id:f.teams.home.id, name:f.teams.home.name, logo:f.teams.home.logo??"" },
-        awayTeam: { id:f.teams.away.id, name:f.teams.away.name, logo:f.teams.away.logo??"" },
-        score: { home:f.goals?.home??null, away:f.goals?.away??null },
-        league: { id:f.league.id, name:f.league.name, logo:f.league.logo??"", country:f.league.country??"" },
-        source: "euro",
-      }))
-      .sort((a:Match,b:Match) => type === "upcoming"
-        ? new Date(a.date).getTime()-new Date(b.date).getTime()
-        : new Date(b.date).getTime()-new Date(a.date).getTime()
-      );
-
-    return { matches, type, from, to };
-  };
+  // source=fd means this team came from football-data.org match
+  // everything else (euro, africa, af, or no source) = api-football
+  const useFd = source === "fd" && fdKey;
 
   try {
-    const { data, hit } = await withCache(cacheKey, fetcher, TTL.TEAM);
-    return NextResponse.json(data, { headers:{"X-Cache":hit.toUpperCase()} });
-  } catch (err:any) {
-    console.error("team/[id] error:", err);
-    return NextResponse.json({ message: err?.message??"Failed" }, { status:500 });
+    const result = useFd
+      ? await fetchFdTeam(id, type, fdKey)
+      : await fetchAfTeam(id, type, afKey);
+
+    // Cache AF team fixtures for 24h — saves quota dramatically
+    cacheSet(cacheKey, result, 24 * 60 * 60 * 1000);
+    return NextResponse.json(result, { headers: { "X-Cache": "MISS" } });
+  } catch (err: any) {
+    console.error(`[team/${id}]`, err.message);
+    return NextResponse.json({ message: err?.message ?? "Failed" }, { status: 500 });
   }
 }

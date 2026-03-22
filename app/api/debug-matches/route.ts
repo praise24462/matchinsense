@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   const url  = new URL(req.url);
   const date = url.searchParams.get("date") ?? new Date().toISOString().split("T")[0];
-  const key  = process.env.FOOTBALL_API_KEY ?? "";
+  const key  = process.env.FOOTBALL_DATA_API_KEY ?? "";
 
-  if (!key) return NextResponse.json({ error: "No FOOTBALL_API_KEY" });
+  if (!key) return NextResponse.json({ error: "No FOOTBALL_DATA_API_KEY" });
 
   try {
     // Check health
