@@ -131,6 +131,8 @@ const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
   );
 });
 
+type Props = { initialMatches: Match[]; initialError?: string | null };
+
 type GroupData = { leagueId: number; leagueName: string; leagueLogo: string; leagueCountry: string; source: string; matches: Match[] };
 const LeagueGroup = memo(function LeagueGroup({ group }: { group: GroupData }) {
   return (
