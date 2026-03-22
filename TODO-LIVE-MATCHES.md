@@ -3,11 +3,11 @@ Track progress on resolving "no live matches" bug.
 
 ## Steps
 - [ ] **Step 1**: Create TODO-LIVE-MATCHES.md ✅ **(done)**
-- [ ] **Step 2**: Read services/prisma.ts to confirm DB queries
-- [ ] **Step 3**: Edit app/matches/MatchesClient.tsx 
-  - Fix date logic (UTC consistent)
-  - Loosen isTodayLive
-  - Improve polling
+- [x] **Step 2**: Read services/prisma.ts to confirm DB queries
+- [x] **Step 3**: Edit app/matches/MatchesClient.tsx 
+  - Fix date logic (UTC consistent) ✅
+  - Loosen isTodayLive ✅
+  - Improve polling ✅
 - [ ] **Step 4**: Edit app/api/matches/route.ts
   - Add Prisma DB fallback
   - Reduce live TTL

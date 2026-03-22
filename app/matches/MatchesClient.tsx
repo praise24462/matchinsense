@@ -92,14 +92,8 @@ const Logo = memo(function Logo({ src, size, fallback }: { src: string; size: nu
   return <Image src={src} alt="" width={size} height={size} style={{ objectFit: "contain", flexShrink: 0 }} onError={() => setErr(true)} />;
 });
 
-const isTodayLive = (match: Match): boolean => {
-  const today = new Date().toDateString();
-  const matchDate = new Date(match.date).toDateString();
-  return (match.status === "LIVE" || match.status === "HT") && matchDate === today;
-};
-
-const MatchRow = memo(function MatchRow({ match, isSaved, onSaveToggle }: { match: Match; isSaved: boolean; onSaveToggle: (matchId: number) => void }) {
-  const isLive = isTodayLive(match);
+const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
+  const isLive = match.status === "LIVE" || match.status === "HT";
   const isFT   = match.status === "FT";
   const isNS   = match.status === "NS";
   const homeWin = isFT && (match.score.home ?? 0) > (match.score.away ?? 0);
@@ -130,15 +124,15 @@ const MatchRow = memo(function MatchRow({ match, isSaved, onSaveToggle }: { matc
           </>
         )}
       </div>
-      <button className={styles.starBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); onSaveToggle(match.id); }} aria-label="Save match" style={{color: isSaved ? "var(--accent)" : "currentColor"}}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <button className={styles.starBtn} onClick={e => { e.preventDefault(); e.stopPropagation(); }} aria-label="Follow">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
     </Link>
   );
 });
 
 type GroupData = { leagueId: number; leagueName: string; leagueLogo: string; leagueCountry: string; source: string; matches: Match[] };
-const LeagueGroup = memo(function LeagueGroup({ group, savedMatchIds, onSaveToggle }: { group: GroupData; savedMatchIds: Set<number>; onSaveToggle: (matchId: number) => void }) {
+const LeagueGroup = memo(function LeagueGroup({ group }: { group: GroupData }) {
   return (
     <div className={styles.leagueGroup}>
       <div className={styles.leagueHead}>
@@ -151,15 +145,12 @@ const LeagueGroup = memo(function LeagueGroup({ group, savedMatchIds, onSaveTogg
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{color:"var(--text-3)"}}><polyline points="9 18 15 12 9 6"/></svg>
       </div>
       <div className={styles.matchList}>
-        {group.matches.map(m => <MatchRow key={m.id} match={m} isSaved={savedMatchIds.has(m.id)} onSaveToggle={onSaveToggle} />)}
+        {group.matches.map(m => <MatchRow key={m.id} match={m} />)}
       </div>
     </div>
   );
 });
-interface Props {
-  initialMatches: Match[];
-  initialError: string | null;
-}
+
 export default function MatchesClient({ initialMatches, initialError }: Props) {
   const [matches,      setMatches]      = useState<Match[]>(initialMatches);
   const [loading,      setLoading]      = useState(false);
@@ -169,41 +160,12 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   const [showCal,      setShowCal]      = useState(false);
   const [search,       setSearch]       = useState("");
   const [filterComp,   setFilterComp]   = useState<string | null>(null);
-  const [savedMatchIds, setSavedMatchIds] = useState<Set<number>>(new Set());
-  const [loadingSaved, setLoadingSaved] = useState(false);
 
   // Show 5 days: 2 days ago → today → tomorrow
   // Gives access to matches even across midnight timezone boundary
   const MIN_DATE  = offsetToIso(-2);
   const MAX_DATE  = offsetToIso(1);
   const dateStrip = [-2, -1, 0, 1].map(i => ({ iso: offsetToIso(i), label: isoLabel(offsetToIso(i)) }));
-
-  // Load saved matches on mount
-  useEffect(() => {
-    setLoadingSaved(true);
-    fetch("/api/saved-matches-test")
-      .then(async r => {
-        // Handle non-200 responses
-        if (!r.ok) {
-          console.warn("Failed to load saved matches, status:", r.status);
-          setSavedMatchIds(new Set());
-          return;
-        }
-        const data = await r.json();
-        // Handle response that's an array or empty
-        if (Array.isArray(data)) {
-          const ids = new Set(data.map((s: any) => s.matchId));
-          setSavedMatchIds(ids);
-        } else {
-          setSavedMatchIds(new Set());
-        }
-      })
-      .catch(err => {
-        console.warn("Failed to load saved matches:", err);
-        setSavedMatchIds(new Set());
-      })
-      .finally(() => setLoadingSaved(false));
-  }, []);
 
   // Single effect — fetches once per date, stops on quota error
   useEffect(() => {
@@ -213,19 +175,13 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     setMatches([]);
 
     fetch(`/api/matches?date=${selectedDate}`)
-      .then(async r => {
-        // Check for quota error (429 status)
-        if (r.status === 429) {
-          setFetchError("quota");
-          return;
-        }
-        const data = await r.json();
+      .then(r => r.json())
+      .then(data => {
         if (cancelled) return;
         if (Array.isArray(data)) {
           setMatches(data);
-          setFetchError(null);
         } else {
-          // Non-array response is an error
+          // API quota exceeded or other error — don't retry
           setFetchError("quota");
         }
       })
@@ -240,61 +196,48 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     if (selectedDate !== todayIso() || fetchError) return;
     const iv = setInterval(() => {
       fetch(`/api/matches?date=${selectedDate}`)
-        .then(async r => {
-          if (r.status === 429) return; // Quota error, don't retry
-          const data = await r.json();
-          if (Array.isArray(data) && data.length > 0) setMatches(data);
-        })
+        .then(r => r.json())
+        .then(data => { if (Array.isArray(data) && data.length > 0) setMatches(data); })
         .catch(() => {});
     }, 60000);
     return () => clearInterval(iv);
   }, [selectedDate, fetchError]);
 
   let display = matches;
-  if (liveOnly) display = display.filter(m => isTodayLive(m));
+  if (liveOnly) display = display.filter(m => m.status === "LIVE" || m.status === "HT");
   if (filterComp) {
     display = display.filter(m => String(m.league.id) === filterComp);
   }
 
   const groups = groupByLeague(display);
-  const liveCount = matches.filter(m => isTodayLive(m)).length;
+  const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
 
   // Progressive rendering — show 8 groups first, load more as user scrolls
   const INITIAL_GROUPS = 8;
   const BATCH_SIZE     = 10;
-const [currentPage, setCurrentPage] = useState(1);
-  const GROUPS_PER_PAGE = 8;
+  const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
+  const sentinelRef    = useRef<HTMLDivElement>(null);
+  const groupsLenRef   = useRef(0);
 
+  // Reset visible count when matches change
+  useEffect(() => { setVisibleCount(INITIAL_GROUPS); }, [selectedDate]);
 
+  // Stable IntersectionObserver — doesn't recreate on every render
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting)
+        setVisibleCount(v => Math.min(v + BATCH_SIZE, groupsLenRef.current));
+    }, { rootMargin: "400px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []); // stable — no dependencies
 
-const visibleGroups = groups.slice(0, currentPage * GROUPS_PER_PAGE);
+  // Keep groupsLenRef in sync without recreating the observer
+  groupsLenRef.current = groups.length;
 
-  // Handle saving/unsaving matches
-  const handleSaveToggle = (matchId: number) => {
-    const isSaved = savedMatchIds.has(matchId);
-    const action = isSaved ? "unsave" : "save";
-    
-    fetch("/api/saved-matches-test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ matchId, action }),
-    })
-      .then(async r => {
-        if (!r.ok) {
-          console.error("Failed to toggle saved match, status:", r.status);
-          return;
-        }
-        // Update local state
-        const newSaved = new Set(savedMatchIds);
-        if (action === "save") {
-          newSaved.add(matchId);
-        } else {
-          newSaved.delete(matchId);
-        }
-        setSavedMatchIds(newSaved);
-      })
-      .catch(err => console.error("Failed to toggle saved match:", err));
-  };
+  const visibleGroups = groups.slice(0, visibleCount);
 
   // Build competitions list dynamically from whatever matches are loaded
   const allComps = Array.from(
@@ -397,7 +340,10 @@ const visibleGroups = groups.slice(0, currentPage * GROUPS_PER_PAGE);
           <div className={styles.empty}>
             <div className={styles.emptyIcon}>⏳</div>
             <h2 className={styles.emptyTitle}>Daily limit reached</h2>
-            <p className={styles.emptyText}>The free API plan allows 100 requests per day. Resets at 1:00 AM Lagos time. Check back then!</p>
+            <p className={styles.emptyText}>The free API plan resets at 1:00 AM Lagos time. Yesterday's matches are still available.</p>
+            <button className={styles.emptyBtn} onClick={() => { const y = new Date(); y.setDate(y.getDate()-1); setSelectedDate(y); }}>
+              View yesterday's matches →
+            </button>
           </div>
         )}
 
@@ -408,34 +354,19 @@ const visibleGroups = groups.slice(0, currentPage * GROUPS_PER_PAGE);
             <h2 className={styles.emptyTitle}>{liveOnly ? "No live matches right now" : `No matches on ${isoLabel(selectedDate)}`}</h2>
             <p className={styles.emptyText}>{liveOnly ? "No games are currently in play." : "No fixtures found for this date."}</p>
             {liveOnly && <button className={styles.emptyBtn} onClick={() => setLiveOnly(false)}>Show all matches</button>}
+            {!liveOnly && <button className={styles.emptyBtn} onClick={() => { const y = new Date(); y.setDate(y.getDate()-1); setSelectedDate(y); }}>View yesterday →</button>}
           </div>
         )}
 
         {/* League groups */}
         {!loading && visibleGroups.map(group => (
-          <LeagueGroup key={group.leagueId} group={group} savedMatchIds={savedMatchIds} onSaveToggle={handleSaveToggle} />
+          <LeagueGroup key={group.leagueId} group={group} />
         ))}
 
-        {/* Pagination */}
-        {!loading && groups.length > GROUPS_PER_PAGE && (
-          <div className={styles.pagination}>
-            <button 
-              className={styles.pageBtn}
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-            >
-              ← Prev
-            </button>
-            <span className={styles.pageInfo}>
-              Page {currentPage}
-            </span>
-            <button 
-              className={styles.pageBtn}
-              disabled={currentPage * GROUPS_PER_PAGE >= groups.length}
-              onClick={() => setCurrentPage(p => p + 1)}
-            >
-              Next →
-            </button>
+        {/* Sentinel — triggers loading next batch */}
+        {!loading && visibleCount < groups.length && (
+          <div ref={sentinelRef} style={{ padding: "12px", textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>
+            Showing {visibleCount} of {groups.length} leagues…
           </div>
         )}
       </div>
