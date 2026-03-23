@@ -12,7 +12,7 @@ export default function Footer() {
         </div>
 
         <p className={styles.tagline}>
-          Live scores, AI-powered match insights and football intelligence — built for African fans.
+          Live scores, AI-powered match insights and football intelligence.
         </p>
 
         <nav className={styles.links}>

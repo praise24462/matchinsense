@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s | MatchInsense",
   },
   description:
-    "Live scores, AI-powered match reports, lineups and betting predictions for Premier League, La Liga, NPFL and more. Built for African football fans.",
+    "Live scores, AI-powered match reports, lineups and betting predictions for Premier League, La Liga, NPFL and more." ,
 
   keywords: [
     "football analysis",
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "MatchInsense — Live Football Intelligence",
     description:
-      "AI match reports, live scores and betting predictions. Built for African football fans.",
+      "AI match reports, live scores and betting predictions.",
     images: ["/og-image.png"],
     creator: "@matchinsense", // update when you create the account
   },
