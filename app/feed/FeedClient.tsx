@@ -93,7 +93,7 @@ export default function FeedClient() {
               {countryTeams.map(t => (
                 <Link key={t.id} href={`/team/${t.id}?source=${t.source}`} className={styles.clubCard} style={{textDecoration:"none"}}>
                   <div className={styles.clubLogoWrap}>
-                    <Logo src={t.logo} size={38} fallback={t.shortName[0]} />
+                    <Logo src={t.logo} size={40} fallback={t.shortName[0]} />
                   </div>
                   <span className={styles.clubName}>{t.shortName}</span>
                   <span className={styles.clubLeague}>{t.league}</span>
