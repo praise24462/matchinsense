@@ -1,0 +1,58 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// components/FallbackBanner/FallbackBanner.module.scss
+// ─────────────────────────────────────────────────────────────────────────────
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+
+  padding: 0.875rem 1.125rem;
+  margin: 0 0 1.25rem;
+  border-radius: 8px;
+
+  background-color: #fff8e7;          // warm amber tint
+  border: 1px solid #f5c842;
+  border-left: 4px solid #f5a623;    // accent stripe
+
+  // Dark-mode override (if your app uses a data-theme or prefers-color-scheme)
+  @media (prefers-color-scheme: dark) {
+    background-color: #2a2414;
+    border-color: #7a5c00;
+    border-left-color: #c98a00;
+  }
+}
+
+.icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.title {
+  font-size: 0.9375rem;   // ~15px
+  font-weight: 600;
+  color: #7a4f00;
+
+  @media (prefers-color-scheme: dark) {
+    color: #e8b84b;
+  }
+}
+
+.body {
+  margin: 0;
+  font-size: 0.875rem;   // 14px
+  color: #5a3d00;
+  line-height: 1.5;
+
+  @media (prefers-color-scheme: dark) {
+    color: #c9a76a;
+  }
+}

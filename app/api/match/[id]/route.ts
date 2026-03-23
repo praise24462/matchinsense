@@ -134,9 +134,19 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   try {
-    const match = isFdMatch && fdKey
-      ? await fetchFromFD(matchId, fdKey)
-      : await fetchFromAF(matchId, afKey);
+    let match: MatchDetails;
+    
+    if (isFdMatch && fdKey) {
+      try {
+        match = await fetchFromFD(matchId, fdKey);
+      } catch (fdErr: any) {
+        // If FD rate limits (429) or other error, fall back to AF
+        console.log(`[match/${matchId}] FD failed (${fdErr.message}), falling back to AF`);
+        match = await fetchFromAF(matchId, afKey);
+      }
+    } else {
+      match = await fetchFromAF(matchId, afKey);
+    }
 
     // Cache in DB — finished matches cached 7 days, live 60s, upcoming 1hr
     const ttl = ttlForStatus(match.status);
@@ -144,9 +154,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
     return NextResponse.json(match, { headers: { "X-Cache": "MISS" } });
   } catch (err: any) {
-    console.error(`[match/${matchId}]`, err.message);
+    console.error(`[match/${matchId}]`, err.message, err.stack);
     if (err.message === "Match not found")
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
-    return NextResponse.json({ error: "Failed to load match" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load match", details: err.message }, { status: 500 });
   }
 }
