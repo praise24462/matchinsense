@@ -34,9 +34,9 @@ function cacheSet(key: string, data: Match[], ttlMs: number) {
 
 function getTtl(date: string, hasLive: boolean): number {
   const today = new Date().toISOString().split("T")[0];
-  if (date < today) return 60 * 60 * 1000;        // past: 1 hour
-  if (date > today) return 30 * 60 * 1000;        // future: 30 min
-  return hasLive ? 60 * 1000 : 5 * 60 * 1000;    // today: 60s live, 5min idle
+  if (date < today) return 24 * 60 * 60 * 1000;  // past: 24 hours
+  if (date > today) return 60 * 60 * 1000;        // future: 1 hour
+  return hasLive ? 60 * 1000 : 10 * 60 * 1000;   // today: 60s live, 10min idle
 }
 
 // ── Priority sort ─────────────────────────────────────────────────────────
@@ -127,38 +127,25 @@ async function fetchWithDedup(key: string, fetcher: () => Promise<Match[]>): Pro
 async function fetchEuropean(date: string, apiKey: string): Promise<Match[]> {
   const all: Match[] = [];
 
-  for (const comp of FD_COMPETITIONS) {
-    try {
-      const res = await fetch(
+  // Fetch all competitions in parallel — much faster than sequential
+  const results = await Promise.allSettled(
+    FD_COMPETITIONS.map(comp =>
+      fetch(
         `${FD_BASE}/competitions/${comp.code}/matches?dateFrom=${date}&dateTo=${date}`,
         { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-      );
+      ).then(res => {
+        if (!res.ok) return [];
+        return res.json().then(data => {
+          const matches: Match[] = [];
+          mapFdMatches(data.matches ?? [], comp, matches);
+          return matches;
+        });
+      })
+    )
+  );
 
-      if (res.status === 429) {
-        console.log(`[FD] Rate limited — waiting 12s before retry`);
-        await new Promise(r => setTimeout(r, 12000));
-        const retry = await fetch(
-          `${FD_BASE}/competitions/${comp.code}/matches?dateFrom=${date}&dateTo=${date}`,
-          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-        );
-        if (!retry.ok) continue;
-        const d = await retry.json();
-        mapFdMatches(d.matches ?? [], comp, all);
-        await new Promise(r => setTimeout(r, 700));
-        continue;
-      }
-
-      if (!res.ok) { console.log(`[FD] ${comp.code}: HTTP ${res.status}`); continue; }
-
-      const data = await res.json();
-      mapFdMatches(data.matches ?? [], comp, all);
-
-      // Respect 10 req/min rate limit
-      await new Promise(r => setTimeout(r, 700));
-
-    } catch (e: any) {
-      console.error(`[FD] ${comp.code} error:`, e?.message);
-    }
+  for (const r of results) {
+    if (r.status === "fulfilled") all.push(...r.value);
   }
 
   console.log(`[FD] ${all.length} European matches for ${date}`);
