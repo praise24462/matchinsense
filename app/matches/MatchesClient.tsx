@@ -16,6 +16,7 @@ function offsetToIso(offset: number) {
 }
 function smartDefaultDate() {
   const hour = new Date().getUTCHours();
+  // Before 6am UTC (7am Lagos), show yesterday since today's matches haven't started
   if (hour < 6) return offsetToIso(-1);
   return todayIso();
 }
@@ -205,10 +206,35 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
 
     fetch(`/api/matches?date=${selectedDate}`)
       .then(r => r.json())
-      .then(data => {
+      .then(async data => {
         if (cancelled) return;
-        if (Array.isArray(data)) setMatches(data);
-        else setFetchError("quota");
+        if (Array.isArray(data)) {
+          // If today returns 0 matches, auto-load yesterday
+          if (data.length === 0 && selectedDate === todayIso()) {
+            const yesterday = offsetToIso(-1);
+            const res2 = await fetch(`/api/matches?date=${yesterday}`);
+            const data2 = await res2.json();
+            if (!cancelled && Array.isArray(data2) && data2.length > 0) {
+              setMatches(data2);
+              setSelectedDate(yesterday);
+              return;
+            }
+          }
+          setMatches(data);
+        } else {
+          // Quota exceeded — auto-load yesterday from cache
+          const yesterday = offsetToIso(-1);
+          try {
+            const res2 = await fetch(`/api/matches?date=${yesterday}`);
+            const data2 = await res2.json();
+            if (!cancelled && Array.isArray(data2) && data2.length > 0) {
+              setMatches(data2);
+              setSelectedDate(yesterday);
+              return;
+            }
+          } catch {}
+          setFetchError("quota");
+        }
       })
       .catch(() => { if (!cancelled) setFetchError("network"); })
       .finally(() => { if (!cancelled) setLoading(false); });
