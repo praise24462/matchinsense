@@ -70,13 +70,15 @@ function sortMatches(matches: Match[]): Match[] {
 
 // ── football-data.org competitions ────────────────────────────────────────
 const FD_COMPETITIONS = [
-  { code: "CL",  leagueId: 2,   name: "Champions League", country: "Europe",  logo: "https://media.api-sports.io/football/leagues/2.png"   },
-  { code: "EL",  leagueId: 3,   name: "Europa League",    country: "Europe",  logo: "https://media.api-sports.io/football/leagues/3.png"   },
-  { code: "PL",  leagueId: 39,  name: "Premier League",   country: "England", logo: "https://media.api-sports.io/football/leagues/39.png"  },
-  { code: "PD",  leagueId: 140, name: "La Liga",          country: "Spain",   logo: "https://media.api-sports.io/football/leagues/140.png" },
-  { code: "SA",  leagueId: 135, name: "Serie A",          country: "Italy",   logo: "https://media.api-sports.io/football/leagues/135.png" },
-  { code: "BL1", leagueId: 78,  name: "Bundesliga",       country: "Germany", logo: "https://media.api-sports.io/football/leagues/78.png"  },
-  { code: "FL1", leagueId: 61,  name: "Ligue 1",          country: "France",  logo: "https://media.api-sports.io/football/leagues/61.png"  },
+  { code: "CL",  leagueId: 2,   name: "Champions League",      country: "Europe",  logo: "https://media.api-sports.io/football/leagues/2.png"   },
+  { code: "EL",  leagueId: 3,   name: "Europa League",         country: "Europe",  logo: "https://media.api-sports.io/football/leagues/3.png"   },
+  { code: "EC",  leagueId: 4,   name: "Euro Championship",     country: "Europe",  logo: "https://media.api-sports.io/football/leagues/4.png"   },
+  { code: "WC",  leagueId: 1,   name: "FIFA World Cup",        country: "World",   logo: "https://media.api-sports.io/football/leagues/1.png"   },
+  { code: "PL",  leagueId: 39,  name: "Premier League",        country: "England", logo: "https://media.api-sports.io/football/leagues/39.png"  },
+  { code: "PD",  leagueId: 140, name: "La Liga",               country: "Spain",   logo: "https://media.api-sports.io/football/leagues/140.png" },
+  { code: "SA",  leagueId: 135, name: "Serie A",               country: "Italy",   logo: "https://media.api-sports.io/football/leagues/135.png" },
+  { code: "BL1", leagueId: 78,  name: "Bundesliga",            country: "Germany", logo: "https://media.api-sports.io/football/leagues/78.png"  },
+  { code: "FL1", leagueId: 61,  name: "Ligue 1",               country: "France",  logo: "https://media.api-sports.io/football/leagues/61.png"  },
 ];
 
 const FD_STATUS_MAP: Record<string, string> = {
