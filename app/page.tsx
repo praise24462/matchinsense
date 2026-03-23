@@ -53,7 +53,9 @@ function sortMatches(matches: Match[]): Match[] {
 }
 
 function getDate(offset: number) {
+  // Use Lagos time (UTC+1)
   const d = new Date();
+  d.setTime(d.getTime() + 60 * 60 * 1000); // shift to UTC+1
   d.setUTCDate(d.getUTCDate() + offset);
   return d.toISOString().split("T")[0];
 }

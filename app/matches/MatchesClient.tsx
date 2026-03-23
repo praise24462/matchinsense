@@ -6,18 +6,23 @@ import Link from "next/link";
 import type { Match } from "@/types";
 import styles from "./matches.module.scss";
 
+function toLagosIso(date: Date): string {
+  // Lagos is UTC+1
+  const lagos = new Date(date.getTime() + 60 * 60 * 1000);
+  return lagos.toISOString().split("T")[0];
+}
 function todayIso() {
-  return new Date().toISOString().split("T")[0];
+  return toLagosIso(new Date());
 }
 function offsetToIso(offset: number) {
   const d = new Date();
-  d.setUTCDate(d.getUTCDate() + offset);
-  return d.toISOString().split("T")[0];
+  d.setDate(d.getDate() + offset);
+  return toLagosIso(d);
 }
 function smartDefaultDate() {
-  const hour = new Date().getUTCHours();
-  // Before 6am UTC (7am Lagos), show yesterday since today's matches haven't started
-  if (hour < 6) return offsetToIso(-1);
+  // Use Lagos time (UTC+1) — if before 6am Lagos, show yesterday
+  const lagosHour = (new Date().getUTCHours() + 1) % 24;
+  if (lagosHour < 6) return offsetToIso(-1);
   return todayIso();
 }
 function isoLabel(iso: string) {
