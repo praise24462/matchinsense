@@ -164,6 +164,111 @@ const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
   );
 });
 
+// ── Upcoming matches fetcher for empty state ─────────────────────────────
+function UpcomingMatchesList() {
+  const [upcoming, setUpcoming] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch next 3 days to find matches
+    async function findUpcoming() {
+      for (let i = 1; i <= 7; i++) {
+        const date = offsetToIso(i);
+        try {
+          const res = await fetch(`/api/matches?date=${date}`);
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setUpcoming(data.slice(0, 20));
+            setLoading(false);
+            return;
+          }
+        } catch {}
+      }
+      setLoading(false);
+    }
+    findUpcoming();
+  }, []);
+
+  if (loading) return (
+    <div style={{padding:"20px", textAlign:"center", color:"var(--text-3)", fontSize:12}}>
+      Finding upcoming matches…
+    </div>
+  );
+
+  if (upcoming.length === 0) return null;
+
+  const date = upcoming[0]?.date ? new Date(upcoming[0].date).toLocaleDateString("en-GB", {
+    weekday:"long", day:"numeric", month:"long"
+  }) : "";
+
+  // Group by league
+  const grouped = new Map<number, {name:string; logo:string; country:string; matches:Match[]}>();
+  for (const m of upcoming) {
+    if (!grouped.has(m.league.id)) {
+      grouped.set(m.league.id, {name:m.league.name, logo:m.league.logo, country:m.league.country, matches:[]});
+    }
+    grouped.get(m.league.id)!.matches.push(m);
+  }
+
+  return (
+    <div style={{width:"100%", marginTop:8}}>
+      <div style={{
+        fontSize:11, fontFamily:"var(--font-mono)", color:"var(--text-3)",
+        letterSpacing:"0.1em", textAlign:"center", marginBottom:16,
+        textTransform:"uppercase"
+      }}>
+        Next matches — {date}
+      </div>
+      {[...grouped.values()].map(group => (
+        <div key={group.name} style={{marginBottom:2}}>
+          <div style={{
+            display:"flex", alignItems:"center", gap:8, padding:"6px 14px",
+            background:"var(--bg-1)", borderBottom:"1px solid var(--border)",
+            borderTop:"1px solid var(--border)"
+          }}>
+            {group.logo && <img src={group.logo} alt="" width={16} height={16} style={{objectFit:"contain"}}/>}
+            <span style={{fontSize:11, fontWeight:700, color:"var(--text)", letterSpacing:"0.06em", textTransform:"uppercase"}}>{group.name}</span>
+            <span style={{fontSize:10, color:"var(--text-3)", marginLeft:"auto"}}>{group.country}</span>
+          </div>
+          {group.matches.map(m => (
+            <Link key={m.id} href={`/match/${m.id}?source=${m.source}`}
+              style={{
+                display:"grid", gridTemplateColumns:"60px 1fr 60px",
+                alignItems:"center", padding:"0", minHeight:52,
+                borderBottom:"1px solid rgba(255,255,255,0.04)",
+                textDecoration:"none", transition:"background 0.08s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background="rgba(255,255,255,0.03)")}
+              onMouseLeave={e => (e.currentTarget.style.background="transparent")}
+            >
+              <div style={{display:"flex", alignItems:"center", justifyContent:"center", padding:"0 6px", borderRight:"1px solid rgba(255,255,255,0.06)", alignSelf:"stretch"}}>
+                <span style={{fontSize:12, fontWeight:600, fontFamily:"var(--font-mono)", color:"var(--text-2)"}}>
+                  {new Date(m.date).toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit", timeZone:"Africa/Lagos"})}
+                </span>
+              </div>
+              <div style={{padding:"10px 12px", display:"flex", flexDirection:"column", gap:6}}>
+                <div style={{display:"flex", alignItems:"center", gap:7}}>
+                  {m.homeTeam.logo && <img src={m.homeTeam.logo} alt="" width={16} height={16} style={{objectFit:"contain"}}/>}
+                  <span style={{fontSize:13, fontWeight:500, color:"var(--text-2)"}}>{m.homeTeam.name}</span>
+                </div>
+                <div style={{display:"flex", alignItems:"center", gap:7}}>
+                  {m.awayTeam.logo && <img src={m.awayTeam.logo} alt="" width={16} height={16} style={{objectFit:"contain"}}/>}
+                  <span style={{fontSize:13, fontWeight:500, color:"var(--text-2)"}}>{m.awayTeam.name}</span>
+                </div>
+              </div>
+              <div style={{display:"flex", alignItems:"center", justifyContent:"center", padding:"0 8px", borderLeft:"1px solid rgba(255,255,255,0.06)", alignSelf:"stretch"}}>
+                <span style={{fontSize:11, fontFamily:"var(--font-mono)", color:"var(--accent)", background:"var(--accent-dim)", padding:"3px 7px", borderRadius:4}}>
+                  {new Date(m.date).toLocaleDateString("en-GB", {day:"numeric", month:"short"})}
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type Props = { initialMatches: Match[]; initialError?: string | null };
 
 type GroupData = { leagueId: number; leagueName: string; leagueLogo: string; leagueCountry: string; source: string; matches: Match[] };
@@ -214,26 +319,43 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
       .then(async data => {
         if (cancelled) return;
         if (Array.isArray(data)) {
-          // If today returns 0 matches, auto-load yesterday
           if (data.length === 0 && selectedDate === todayIso()) {
-            const yesterday = offsetToIso(-1);
-            const res2 = await fetch(`/api/matches?date=${yesterday}`);
+            // No matches today — try tomorrow first (upcoming fixtures)
+            const tomorrow = offsetToIso(1);
+            const res2 = await fetch(`/api/matches?date=${tomorrow}`);
             const data2 = await res2.json();
             if (!cancelled && Array.isArray(data2) && data2.length > 0) {
               setMatches(data2);
+              setSelectedDate(tomorrow);
+              return;
+            }
+            // If tomorrow also empty, fall back to yesterday
+            const yesterday = offsetToIso(-1);
+            const res3 = await fetch(`/api/matches?date=${yesterday}`);
+            const data3 = await res3.json();
+            if (!cancelled && Array.isArray(data3) && data3.length > 0) {
+              setMatches(data3);
               setSelectedDate(yesterday);
               return;
             }
           }
           setMatches(data);
         } else {
-          // Quota exceeded — auto-load yesterday from cache
-          const yesterday = offsetToIso(-1);
+          // Quota exceeded — try tomorrow then yesterday
           try {
-            const res2 = await fetch(`/api/matches?date=${yesterday}`);
+            const tomorrow = offsetToIso(1);
+            const res2 = await fetch(`/api/matches?date=${tomorrow}`);
             const data2 = await res2.json();
             if (!cancelled && Array.isArray(data2) && data2.length > 0) {
               setMatches(data2);
+              setSelectedDate(tomorrow);
+              return;
+            }
+            const yesterday = offsetToIso(-1);
+            const res3 = await fetch(`/api/matches?date=${yesterday}`);
+            const data3 = await res3.json();
+            if (!cancelled && Array.isArray(data3) && data3.length > 0) {
+              setMatches(data3);
               setSelectedDate(yesterday);
               return;
             }
@@ -406,11 +528,32 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
         {/* Empty */}
         {!loading && !fetchError && groups.length === 0 && (
           <div className={styles.empty}>
-            <div className={styles.emptyIcon}>📅</div>
-            <h2 className={styles.emptyTitle}>{liveOnly ? "No live matches right now" : `No matches on ${isoLabel(selectedDate)}`}</h2>
-            <p className={styles.emptyText}>{liveOnly ? "No games are currently in play." : "No fixtures found for this date."}</p>
-            {liveOnly && <button className={styles.emptyBtn} onClick={() => setLiveOnly(false)}>Show all matches</button>}
-            {!liveOnly && <button className={styles.emptyBtn} onClick={() => { const y = new Date(); y.setDate(y.getDate()-1); setSelectedDate(y.toISOString().split("T")[0]); }}>View yesterday →</button>}
+            {liveOnly ? (
+              <>
+                <div className={styles.emptyIcon}>📺</div>
+                <h2 className={styles.emptyTitle}>No live matches right now</h2>
+                <p className={styles.emptyText}>No games are currently in play.</p>
+                <button className={styles.emptyBtn} onClick={() => setLiveOnly(false)}>Show all matches</button>
+              </>
+            ) : (
+              <>
+                <div className={styles.emptyIcon}>📅</div>
+                <h2 className={styles.emptyTitle}>No matches on {isoLabel(selectedDate)}</h2>
+                <p className={styles.emptyText} style={{marginBottom:20}}>
+                  {selectedDate === todayIso() ? "International break or rest day — here are upcoming fixtures:" : "No fixtures found for this date."}
+                </p>
+                <div style={{display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center", marginBottom:24}}>
+                  <button className={styles.emptyBtn} onClick={() => setSelectedDate(offsetToIso(1))}>
+                    Tomorrow →
+                  </button>
+                  <button className={styles.emptyBtn} style={{background:"var(--bg-card)", color:"var(--text-2)", border:"1px solid var(--border)"}}
+                    onClick={() => setSelectedDate(offsetToIso(-1))}>
+                    Yesterday
+                  </button>
+                </div>
+                {selectedDate === todayIso() && <UpcomingMatchesList />}
+              </>
+            )}
           </div>
         )}
 
