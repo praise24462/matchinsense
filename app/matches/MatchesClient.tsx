@@ -165,6 +165,33 @@ const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
   );
 });
 
+// ── Match importance scoring ──────────────────────────────────────────────────────
+/**
+ * Score matches by importance for sorting
+ * Higher score = higher importance
+ * 
+ * Live matches: 1000+
+ * Upcoming matches: 500-999 (based on league tier)
+ * Finished matches: 0-499 (based on league tier)
+ */
+function getMatchImportance(match: Match, leaguePriority: Record<number, number>): number {
+  const leagueId = match.league.id;
+  const basePriority = leaguePriority[leagueId] ?? 100;
+  
+  // Live/HT matches have highest importance
+  if (match.status === "LIVE" || match.status === "HT") {
+    return 1000 + (100 - basePriority);
+  }
+  
+  // Upcoming matches next (NS = Not Started)
+  if (match.status === "NS") {
+    return 500 + (100 - basePriority);
+  }
+  
+  // Finished matches last (FT, PST, CANC, etc.)
+  return 100 - basePriority;
+}
+
 // ── LeagueGroup ───────────────────────────────────────────────────────────────
 
 type GroupData = { leagueId: number; leagueName: string; leagueLogo: string; leagueCountry: string; source: string; matches: Match[] };
@@ -345,31 +372,43 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   if (liveOnly)   display = display.filter(m => m.status === "LIVE" || m.status === "HT");
   if (filterComp) display = display.filter(m => String(m.league.id) === filterComp);
 
+  // Create importance scoring map based on league priorities
+  const importancePriority: Record<number, number> = {
+    2: 1, 3: 2, 848: 3, 4: 4, 1: 5,
+    39: 6, 140: 7, 135: 8, 78: 9, 61: 10,
+    88: 11, 94: 12, 144: 13, 12: 14, 20: 15, 6: 16,
+    399: 17, 288: 18, 167: 19, 13: 26, 11: 27, 71: 28,
+  };
+  
+  // Sort matches by importance (live first, then upcoming by league tier, then finished)
+  display = display.sort((a, b) => {
+    const scoreA = getMatchImportance(a, importancePriority);
+    const scoreB = getMatchImportance(b, importancePriority);
+    
+    if (scoreB !== scoreA) return scoreB - scoreA; // Higher score first
+    
+    // Secondary sort: by match date
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
+  });
+
   const groups    = groupByLeague(display);
   const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-  const INITIAL_GROUPS = 8;
-  const BATCH_SIZE     = 10;
+  // ── Pagination ────────────────────────────────────────────────────────
+  const INITIAL_GROUPS = 6;
+  const BATCH_SIZE     = 8;
   const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
-  const sentinelRef  = useRef<HTMLDivElement>(null);
   const groupsLenRef = useRef(0);
 
   useEffect(() => { setVisibleCount(INITIAL_GROUPS); }, [selectedDate]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting)
-        setVisibleCount(v => Math.min(v + BATCH_SIZE, groupsLenRef.current));
-    }, { rootMargin: "400px" });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const handleLoadMore = () => {
+    setVisibleCount(v => Math.min(v + BATCH_SIZE, groupsLenRef.current));
+  };
 
   groupsLenRef.current = groups.length;
   const visibleGroups = groups.slice(0, visibleCount);
+  const hasMoreGroups = visibleCount < groups.length;
 
   // ── Sidebar competitions ──────────────────────────────────────────────────
   const SIDEBAR_PRIORITY: Record<string, number> = {
@@ -565,10 +604,27 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
           <LeagueGroup key={group.leagueId} group={group} />
         ))}
 
-        {/* Infinite scroll sentinel */}
-        {!loading && visibleCount < groups.length && (
-          <div ref={sentinelRef} style={{ padding: "12px", textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>
-            Showing {visibleCount} of {groups.length} leagues…
+        {/* Load more button - explicit pagination */}
+        {!loading && hasMoreGroups && (
+          <div style={{ padding: "20px 0", textAlign: "center" }}>
+            <button
+              onClick={handleLoadMore}
+              style={{
+                padding: "10px 20px",
+                background: "var(--accent, #FF4B2B)",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "600",
+              }}
+            >
+              Load more competitions ({visibleCount} of {groups.length})
+            </button>
+            <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-3)" }}>
+              Showing {visibleCount} of {groups.length} competitions
+            </div>
           </div>
         )}
 

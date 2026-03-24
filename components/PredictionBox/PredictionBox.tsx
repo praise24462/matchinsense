@@ -14,6 +14,12 @@ interface Props {
   awayTeam?: string;
   competition?: string;
   matchDate?: string;
+  // Data enrichment tracking
+  dataEnrichment?: {
+    usedFormData?: boolean;
+    usedH2HData?: boolean;
+    usedBettingContext?: boolean;
+  };
 }
 
 // ── Parse structured AI output ────────────────────────────────────────────────
@@ -300,6 +306,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 export default function PredictionBox({
   prediction, loading, error, generatedAt, isUpcoming, onGenerate,
   homeTeam = "Home", awayTeam = "Away", competition = "Football", matchDate,
+  dataEnrichment = {},
 }: Props) {
   const [copied,          setCopied]         = useState(false);
   const [disclaimerOpen,  setDisclaimerOpen] = useState(false);
@@ -468,6 +475,21 @@ export default function PredictionBox({
 
         {prediction && !loading && (
           <>
+            {/* ── Data Enrichment Badge ── */}
+            {(dataEnrichment?.usedFormData || dataEnrichment?.usedH2HData || dataEnrichment?.usedBettingContext) && (
+              <div className={styles.enrichmentBadge}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20M2 12h20"/>
+                </svg>
+                <span>Enhanced with</span>
+                <div className={styles.enrichmentTags}>
+                  {dataEnrichment?.usedFormData && <span className={styles.tag}>Team Form</span>}
+                  {dataEnrichment?.usedH2HData && <span className={styles.tag}>H2H History</span>}
+                  {dataEnrichment?.usedBettingContext && <span className={styles.tag}>Market Data</span>}
+                </div>
+              </div>
+            )}
+
             {/* ── AI Personality Banner ── */}
             {personality && (
               <div className={`${styles.personalityBanner} ${styles[`personality_${personality.tone}`]}`}>

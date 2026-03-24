@@ -202,6 +202,7 @@ function TabsSection({ match, isUpcoming, isFinished, isLive,
   preview, previewTime, previewLoading, previewError,
   prediction, predictionTime, predictionLoading, predictionError,
   onGenSummary, onGenPreview, onGenPrediction,
+  dataEnrichment,
 }: any) {
   const [tab, setTab] = useState<"info"|"lineups">("info");
   const [lineups, setLineups] = useState<any[]>([]);
@@ -291,7 +292,7 @@ function TabsSection({ match, isUpcoming, isFinished, isLive,
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
                   {isUpcoming ? "AI Prediction" : "AI Insight"}
                 </h2>
-                <PredictionBox prediction={prediction} loading={predictionLoading} error={predictionError} generatedAt={predictionTime} isUpcoming={isUpcoming} onGenerate={onGenPrediction} homeTeam={homeTeam.name} awayTeam={awayTeam.name} competition={league.name} matchDate={date}/>
+                <PredictionBox prediction={prediction} loading={predictionLoading} error={predictionError} generatedAt={predictionTime} isUpcoming={isUpcoming} onGenerate={onGenPrediction} homeTeam={homeTeam.name} awayTeam={awayTeam.name} competition={league.name} matchDate={date} dataEnrichment={dataEnrichment}/>
               </section>
             </div>
 
@@ -357,13 +358,24 @@ function MatchDetailInner() {
   const [predictionTime, setPredictionTime]   = useState<string | null>(null);
   const [predictionLoading, setPRL]           = useState(false);
   const [predictionError, setPredictionError] = useState<string | null>(null);
+  const [dataEnrichment, setDataEnrichment]   = useState<{ usedFormData?: boolean; usedH2HData?: boolean; usedBettingContext?: boolean }>({});
 
   useEffect(() => {
     if (!id) return;
     fetch(`/api/match/${id}?source=${source}`)
-      .then(async r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(async r => { 
+        if (!r.ok) {
+          const errData = await r.json().catch(() => ({}));
+          console.error("[match detail] API error:", r.status, errData);
+          throw new Error(errData?.error ?? `HTTP ${r.status}`);
+        }
+        return r.json();
+      })
       .then(setMatch)
-      .catch(() => setME("Could not load this match."))
+      .catch((err) => {
+        console.error("[match detail] Failed to load:", err);
+        setME(err?.message ?? "Could not load this match.");
+      })
       .finally(() => setLM(false));
   }, [id, source]);
 
@@ -409,12 +421,41 @@ function MatchDetailInner() {
     if (!match) return;
     setPRL(true); setPredictionError(null);
     try {
+      // Convert statistics array to separate home/away objects for AI
+      let homeStats: Record<string, any> = {};
+      let awayStats: Record<string, any> = {};
+      
+      if (match.statistics && Array.isArray(match.statistics)) {
+        for (const stat of match.statistics) {
+          // Convert label to camelCase property name (e.g., "Possession" -> "possession", "Shots on Target" -> "shotsOnTarget")
+          const propName = stat.label
+            .replace(/\s+/g, ' ')
+            .split(' ')
+            .map((word, i) => i === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join('');
+          
+          homeStats[propName] = stat.home;
+          awayStats[propName] = stat.away;
+        }
+      }
+
       const res = await fetch("/api/ai-prediction", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ homeTeam: match.homeTeam.name, awayTeam: match.awayTeam.name, competition: match.league.name,
-          date: match.date, score: match.score, events: match.events, status: match.status }) });
+        body: JSON.stringify({ 
+          homeTeam: match.homeTeam.name, 
+          awayTeam: match.awayTeam.name, 
+          competition: match.league.name,
+          date: match.date, 
+          score: match.score, 
+          events: match.events, 
+          status: match.status, 
+          source,
+          homeStats,
+          awayStats
+        }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message ?? "Server error");
       setPrediction(data.prediction); setPredictionTime(data.generatedAt);
+      setDataEnrichment(data.dataEnrichment || {});
       saveReportToStorage({ matchId: match.id, homeTeam: match.homeTeam.name, awayTeam: match.awayTeam.name,
         score: `${match.score.home ?? "–"} – ${match.score.away ?? "–"}`, competition: match.league.name, type: "prediction", text: data.prediction, source });
     } catch (e: any) { setPredictionError(e?.message ?? "Failed to generate prediction"); }
@@ -542,6 +583,7 @@ function MatchDetailInner() {
         preview={preview} previewTime={previewTime} previewLoading={previewLoading} previewError={previewError}
         prediction={prediction} predictionTime={predictionTime} predictionLoading={predictionLoading} predictionError={predictionError}
         onGenSummary={handleGenSummary} onGenPreview={handleGenPreview} onGenPrediction={handleGenPrediction}
+        dataEnrichment={dataEnrichment}
       />
     </div>
   );

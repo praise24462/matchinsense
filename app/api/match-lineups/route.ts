@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { qcGet, qcSet, QC_TTL } from "@/services/quotaCache";
+import { qcGet, qcSet, QC_TTL } from "@/services/quotacache";
 
 const AS_BASE = "https://v3.football.api-sports.io";
 
