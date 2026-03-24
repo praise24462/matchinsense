@@ -365,7 +365,19 @@ function MatchDetailInner() {
     fetch(`/api/match/${id}?source=${source}`)
       .then(async r => { 
         if (!r.ok) {
-          const errData = await r.json().catch(() => ({}));
+          let errData: Record<string, any> = {};
+          try {
+            errData = await r.json();
+          } catch (parseErr) {
+            console.warn("[match detail] Could not parse error response:", parseErr);
+            // Try to get text instead
+            try {
+              const text = await r.text();
+              console.warn("[match detail] Raw error response:", text);
+            } catch (textErr) {
+              console.warn("[match detail] Could not read error response body");
+            }
+          }
           console.error("[match detail] API error:", r.status, errData);
           throw new Error(errData?.error ?? `HTTP ${r.status}`);
         }

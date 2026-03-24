@@ -124,14 +124,26 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   const fdKey = process.env.FOOTBALL_DATA_API_KEY ?? "";
   const isFdMatch = Number(matchId) < 600000;
 
+  // Check if API keys are configured
+  if (!afKey && !fdKey) {
+    console.error(`[match/${matchId}] No API keys configured`);
+    return NextResponse.json({ error: "Server configuration error", details: "Missing API keys" }, { status: 500 });
+  }
+
   // Check DB cache first — this works across ALL server instances
   const cacheKey = `match:${matchId}`;
-  const cached = await dbGet<MatchDetails>(cacheKey);
-  if (cached) {
-    // For live matches, skip cache
-    if (cached.status !== "LIVE" && cached.status !== "HT") {
-      return NextResponse.json(cached, { headers: { "X-Cache": "DB-HIT" } });
+  let cached: MatchDetails | null = null;
+  try {
+    cached = await dbGet<MatchDetails>(cacheKey);
+    if (cached) {
+      // For live matches, skip cache
+      if (cached.status !== "LIVE" && cached.status !== "HT") {
+        return NextResponse.json(cached, { headers: { "X-Cache": "DB-HIT" } });
+      }
     }
+  } catch (cacheErr: any) {
+    console.warn(`[match/${matchId}] Cache read failed:`, cacheErr.message);
+    // Continue without cache
   }
 
   try {
@@ -143,6 +155,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       } catch (fdErr: any) {
         // If FD rate limits (429) or other error, fall back to AF (with flocking)
         console.log(`[match/${matchId}] FD failed (${fdErr.message}), falling back to AF`);
+        if (!afKey) {
+          throw new Error("FD failed and no African API key available");
+        }
         match = await flock(
           `match:african:${matchId}`,
           () => fetchFromAF(matchId, afKey),
@@ -151,6 +166,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       }
     } else {
       // African league match — use flocking to reduce quota usage
+      if (!afKey) {
+        throw new Error("African API key not configured");
+      }
       match = await flock(
         `match:african:${matchId}`,
         () => fetchFromAF(matchId, afKey),
@@ -159,14 +177,27 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     }
 
     // Cache in DB — finished matches cached 7 days, live 60s, upcoming 1hr
-    const ttl = ttlForStatus(match.status);
-    await dbSet(cacheKey, match, ttl);
+    try {
+      const ttl = ttlForStatus(match.status);
+      await dbSet(cacheKey, match, ttl);
+    } catch (cacheErr: any) {
+      console.warn(`[match/${matchId}] Cache write failed:`, cacheErr.message);
+      // Continue without cache - don't fail the request
+    }
 
     return NextResponse.json(match, { headers: { "X-Cache": "MISS" } });
   } catch (err: any) {
-    console.error(`[match/${matchId}]`, err.message, err.stack);
+    console.error(`[match/${matchId}] Error:`, {
+      message: err.message,
+      stack: err.stack,
+      name: err.name,
+    });
     if (err.message === "Match not found")
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
-    return NextResponse.json({ error: "Failed to load match", details: err.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: "Failed to load match",
+      details: err.message,
+      matchId: matchId,
+    }, { status: 500 });
   }
 }
