@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { metrics } from "@/services/requestFlocking";
 
 /**
  * GET /api/metrics/api-usage
@@ -7,55 +8,18 @@ import type { NextRequest } from "next/server";
  * Useful for monitoring flocking effectiveness.
  */
 
-interface ApiMetrics {
-  timestamp: string;
-  africaRequests: {
-    totalAttempts: number;
-    apiCalls: number;
-    savedByFlocking: number;
-    flockingEfficiency: string; // percentage saved
-  };
-}
-
-// In-memory metrics (resets on server restart)
-const metrics: ApiMetrics = {
-  timestamp: new Date().toISOString(),
-  africaRequests: {
-    totalAttempts: 0,
-    apiCalls: 0,
-    savedByFlocking: 0,
-    flockingEfficiency: "0%",
-  },
-};
-
-// Track a new API call
-export function recordApiCall(source: "african" | "european", wasCached: boolean) {
-  if (source === "african") {
-    metrics.africaRequests.totalAttempts++;
-    if (!wasCached) {
-      metrics.africaRequests.apiCalls++;
-    } else {
-      metrics.africaRequests.savedByFlocking++;
-    }
-
-    // Update efficiency percentage
-    if (metrics.africaRequests.totalAttempts > 0) {
-      const efficiency = (
-        (metrics.africaRequests.savedByFlocking / metrics.africaRequests.totalAttempts) *
-        100
-      ).toFixed(1);
-      metrics.africaRequests.flockingEfficiency = `${efficiency}%`;
-    }
-  }
-}
-
-// Export for external use
-export function getMetrics() {
-  return metrics;
-}
-
 export async function GET(request: NextRequest) {
-  return Response.json(metrics, {
+  const timestamp = new Date().toISOString();
+  
+  return Response.json({
+    timestamp,
+    africaRequests: {
+      totalAttempts: metrics.africaRequests.totalAttempts,
+      apiCalls: metrics.africaRequests.apiCalls,
+      savedByFlocking: metrics.africaRequests.savedByFlocking,
+      flockingEfficiency: metrics.africaRequests.flockingEfficiency,
+    },
+  }, {
     headers: {
       "cache-control": "no-store",
     },

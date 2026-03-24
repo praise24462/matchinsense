@@ -23,8 +23,6 @@ function offsetToIso(offset: number) {
   return toLagosIso(d);
 }
 function smartDefaultDate() {
-  const lagosHour = (new Date().getUTCHours() + 1) % 24;
-  if (lagosHour < 6) return offsetToIso(-1);
   return todayIso();
 }
 function isoLabel(iso: string) {

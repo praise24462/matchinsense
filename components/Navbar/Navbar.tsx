@@ -13,10 +13,11 @@ export default function Navbar() {
   useEffect(() => { setMobileOpen(false); }, [path]);
 
   const links = [
-    { href: "/",          label: "Matches",    active: path === "/" || path.startsWith("/match") || path.startsWith("/team") },
-    { href: "/feed",      label: "Clubs",      active: path === "/feed" },
-    { href: "/summaries", label: "AI Reports", active: path === "/summaries" },
-    { href: "/favorites", label: "Favorites",  active: path === "/favorites" },
+    { href: "/",          label: "Matches",          active: path === "/" || path.startsWith("/match") || path.startsWith("/team") },
+    { href: "/schedule",  label: "Upcoming Matches", active: path === "/schedule" },
+    { href: "/feed",      label: "Clubs",            active: path === "/feed" },
+    { href: "/summaries", label: "AI Reports",       active: path === "/summaries" },
+    { href: "/favorites", label: "Favorites",        active: path === "/favorites" },
   ];
 
   return (

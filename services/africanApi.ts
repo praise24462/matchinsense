@@ -14,6 +14,7 @@ import type {
   FallbackReason,
 } from "@/types/matches";
 import { flock } from "./requestFlocking";
+import { recordAfricanRequest } from "./requestFlocking";
 
 // ── Types mirroring the raw api-sports.io response ───────────────────────────
 
@@ -164,6 +165,9 @@ async function doFetchAfricanMatches(
     console.error(`[africanApi] HTTP ${res.status} from api-sports.io`);
     return { ok: false, reason: "african_error" };
   }
+
+  // ── Record successful API call for metrics ────────────────────────────────
+  recordAfricanRequest(true);
 
   let data: ApiSportsResponse;
   try {

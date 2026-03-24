@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
+import { flock } from "@/services/requestFlocking";
 
 const AS_BASE = "https://v3.football.api-sports.io";
 const FD_BASE = "https://api.football-data.org/v4";
@@ -214,7 +215,11 @@ export async function GET(
   try {
     const result = useFd
       ? await fetchFdTeam(id, type, fdKey)
-      : await fetchAfTeam(id, type, afKey);
+      : await flock(
+          `team:african:${id}:${type}`,
+          () => fetchAfTeam(id, type, afKey),
+          24 * 60 * 60 * 1000 // 24-hour cache for African team data
+        );
 
     // Cache AF team fixtures for 24h — saves quota dramatically
     cacheSet(cacheKey, result, 24 * 60 * 60 * 1000);

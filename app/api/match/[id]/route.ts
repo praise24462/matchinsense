@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { MatchDetails, MatchStatistic, MatchEvent } from "@/types";
 import { dbGet, dbSet, ttlForStatus } from "@/services/dbCache";
+import { flock } from "@/services/requestFlocking";
 
 const AS_BASE = "https://v3.football.api-sports.io";
 const FD_BASE = "https://api.football-data.org/v4";
@@ -140,12 +141,21 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       try {
         match = await fetchFromFD(matchId, fdKey);
       } catch (fdErr: any) {
-        // If FD rate limits (429) or other error, fall back to AF
+        // If FD rate limits (429) or other error, fall back to AF (with flocking)
         console.log(`[match/${matchId}] FD failed (${fdErr.message}), falling back to AF`);
-        match = await fetchFromAF(matchId, afKey);
+        match = await flock(
+          `match:african:${matchId}`,
+          () => fetchFromAF(matchId, afKey),
+          ttlForStatus("NS") // Use 5 min TTL for upcoming matches
+        );
       }
     } else {
-      match = await fetchFromAF(matchId, afKey);
+      // African league match — use flocking to reduce quota usage
+      match = await flock(
+        `match:african:${matchId}`,
+        () => fetchFromAF(matchId, afKey),
+        ttlForStatus("NS") // Use 5 min TTL for upcoming matches
+      );
     }
 
     // Cache in DB — finished matches cached 7 days, live 60s, upcoming 1hr

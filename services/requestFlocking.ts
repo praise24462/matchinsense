@@ -16,9 +16,38 @@
 const pendingRequests = new Map<string, {
   promise: Promise<any>;
   createdAt: number;
+  flockCount: number; // How many requests are flocked together
 }>();
 
 const MAX_FLOCK_AGE = 100; // ms — abandon flock if request takes too long
+
+// Metrics tracking
+export const metrics = {
+  africaRequests: {
+    totalAttempts: 0,
+    apiCalls: 0,
+    savedByFlocking: 0,
+    flockingEfficiency: "0%",
+  },
+};
+
+export function recordAfricanRequest(wasNewApiCall: boolean) {
+  metrics.africaRequests.totalAttempts++;
+  if (wasNewApiCall) {
+    metrics.africaRequests.apiCalls++;
+  } else {
+    metrics.africaRequests.savedByFlocking++;
+  }
+  
+  // Update efficiency
+  if (metrics.africaRequests.totalAttempts > 0) {
+    const efficiency = (
+      (metrics.africaRequests.savedByFlocking / metrics.africaRequests.totalAttempts) *
+      100
+    ).toFixed(1);
+    metrics.africaRequests.flockingEfficiency = `${efficiency}%`;
+  }
+}
 
 /**
  * Execute a fetcher, but if another identical request is in-flight,
@@ -41,6 +70,10 @@ export async function flock<T>(
     const age = now - existing.createdAt;
     if (age < MAX_FLOCK_AGE) {
       console.log(`[Flock] Coalescing ${key} (age: ${age}ms)`);
+      // Record African request as saved by flocking
+      if (key.startsWith("african:")) {
+        recordAfricanRequest(false);
+      }
       return existing.promise;
     }
     // Flock is too old, abandon it
