@@ -11,8 +11,12 @@ import type { MatchesApiResponse } from "@/app/api/matches/route";
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 function toLagosIso(date: Date): string {
-  const lagos = new Date(date.getTime() + 60 * 60 * 1000);
-  return lagos.toISOString().split("T")[0];
+  // Get the current UTC time
+  const utcTime = date.getTime();
+  // Add 1 hour to convert UTC to Lagos time (UTC+1)
+  const lagosTime = new Date(utcTime + 60 * 60 * 1000);
+  // Get the ISO string and extract just the date part
+  return lagosTime.toISOString().split("T")[0];
 }
 function todayIso() {
   return toLagosIso(new Date());
@@ -21,9 +25,6 @@ function offsetToIso(offset: number) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
   return toLagosIso(d);
-}
-function smartDefaultDate() {
-  return todayIso();
 }
 function isoLabel(iso: string) {
   if (iso === todayIso())      return "Today";
@@ -237,7 +238,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   const [loading,      setLoading]      = useState(false);
   const [fetchError,   setFetchError]   = useState<"quota" | "network" | null>(null);
   const [liveOnly,     setLiveOnly]     = useState(false);
-  const [selectedDate, setSelectedDate] = useState(smartDefaultDate());
+  const [selectedDate, setSelectedDate] = useState(todayIso()); // Initialize with today on client
   const [showCal,      setShowCal]      = useState(false);
   const [search,       setSearch]       = useState("");
   const [filterComp,   setFilterComp]   = useState<string | null>(null);
@@ -245,6 +246,11 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   const [fallbackReason, setFallbackReason] = useState<MatchesApiResponse["fallbackReason"]>(undefined);
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([]);
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+
+  // Ensure today's date is always correct on client-side
+  useEffect(() => {
+    setSelectedDate(todayIso());
+  }, []);
 
   const MIN_DATE  = offsetToIso(-2);
   const MAX_DATE  = offsetToIso(1);
