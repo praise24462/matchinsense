@@ -94,7 +94,7 @@ export async function flock<T>(
     });
 
   // Register this flock so subsequent callers can join
-  pendingRequests.set(key, { promise, createdAt: now });
+  pendingRequests.set(key, { promise, createdAt: now, flockCount: 1 });
   
   return promise;
 }

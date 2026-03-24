@@ -110,7 +110,7 @@ export async function resolveMatches(
   // `fetchEuropeanMatchesForDate` here because on a day with no African
   // matches the European calendar may also be quiet — showing the next 7
   // days guarantees the user always sees something.
-  const fallbackReason = africanResult.reason;
+  const fallbackReason = africanResult.ok ? "african_empty" : africanResult.reason;
   const europeanMatches = await fetchUpcomingEuropeanMatches(targetDate, 7);
 
   return {

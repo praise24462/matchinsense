@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
         if (result.ok) recentMatches = result.matches;
       } else {
         const result = await fetchEuropeanMatchesForDate(date);
-        if (result.ok) recentMatches = result.matches;
+        recentMatches = Array.isArray(result) ? result : [];
       }
     } catch (err) {
       console.warn("[betting-value] Could not fetch matches for form calculation");
