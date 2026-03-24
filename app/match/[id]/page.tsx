@@ -282,7 +282,7 @@ function TabsSection({ match, isUpcoming, isFinished, isLive,
                   {isUpcoming ? "AI Preview" : "AI Match Report"}
                 </h2>
                 {isUpcoming
-                  ? <PreviewBox preview={preview} loading={previewLoading} error={previewError} generatedAt={previewTime} onGenerate={onGenPreview}/>
+                  ? <PreviewBox preview={preview} loading={previewLoading} error={previewError} generatedAt={previewTime} onGenerate={onGenPreview} homeTeam={homeTeam.name} awayTeam={awayTeam.name} competition={league.name} matchDate={date}/>
                   : <SummaryBox summary={summary} loading={summaryLoading} error={summaryError} generatedAt={summaryTime} onGenerate={onGenSummary}/>
                 }
               </section>

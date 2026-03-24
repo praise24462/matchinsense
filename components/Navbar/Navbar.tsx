@@ -26,7 +26,7 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link href="/" className={styles.logo}>
-            <Image src="/matchinsense-lockup v2.svg" alt="MatchInsense" width={200} height={42} style={{ objectFit: "contain" }} priority />
+            <Image src="/matchinsense-lockup v2.svg" alt="MatchInsense" width={200} height={42} style={{ objectFit: "contain" }} />
           </Link>
 
           {/* Desktop nav — right */}

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Match } from "@/types";
+import UpcomingMatches from "@/components/UpcomingMatches/UpcomingMatches";
 import styles from "./matches.module.scss";
 import type { MatchesApiResponse } from "@/app/api/matches/route";
 
@@ -244,6 +245,8 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   const [filterComp,   setFilterComp]   = useState<string | null>(null);
   const [isFallback,     setIsFallback]     = useState(false);
   const [fallbackReason, setFallbackReason] = useState<MatchesApiResponse["fallbackReason"]>(undefined);
+  const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([]);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
 
   const MIN_DATE  = offsetToIso(-2);
   const MAX_DATE  = offsetToIso(1);
@@ -280,6 +283,58 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
 
     return () => { cancelled = true; };
   }, [selectedDate]);
+
+  // ── Fetch upcoming matches when today is empty ─────────────────────────────
+  useEffect(() => {
+    const today = todayIso();
+    
+    // Only fetch if:
+    // - We have no matches for today AND
+    // - We're viewing today's date AND
+    // - We're not in live-only mode AND
+    // - We haven't encountered an error
+    if (matches.length > 0 || selectedDate !== today || liveOnly || fetchError) {
+      setUpcomingMatches([]);
+      setLoadingUpcoming(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingUpcoming(true);
+
+    console.log("[MatchesClient] Fetching upcoming matches for empty today...");
+    console.log("[MatchesClient] Today:", today, "Selected:", selectedDate, "Matches:", matches.length);
+
+    fetch(`/api/matches/upcoming`)
+      .then(r => r.json())
+      .then((data: { matches?: any[]; count?: number; error?: string }) => {
+        if (cancelled) return;
+        
+        if (data.error) {
+          console.warn("[MatchesClient] Upcoming matches error:", data.error);
+          setUpcomingMatches([]);
+          setLoadingUpcoming(false);
+          return;
+        }
+
+        const raw = (data.matches ?? []) as Match[];
+        const filtered = raw.filter((m: Match) => m?.league?.id != null);
+        
+        console.log("[MatchesClient] Upcoming matches fetched:", filtered.length);
+        setUpcomingMatches(filtered.slice(0, 30)); // Limit to 30 upcoming matches
+        setLoadingUpcoming(false);
+      })
+      .catch(err => {
+        console.error("[MatchesClient] Failed to fetch upcoming matches:", err);
+        if (!cancelled) {
+          setUpcomingMatches([]);
+          setLoadingUpcoming(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [matches.length, liveOnly, fetchError, selectedDate]);
+
 
   // ── Derived values ────────────────────────────────────────────────────────
   let display = matches;
@@ -384,8 +439,8 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
           </button>
 
           <div className={styles.dateTabs}>
-            {dateStrip.map(d => (
-              <button key={d.iso} className={`${styles.dateTab} ${selectedDate === d.iso ? styles.dateTabActive : ""}`} onClick={() => setSelectedDate(d.iso)}>
+            {dateStrip.map((d, idx) => (
+              <button key={idx} className={`${styles.dateTab} ${selectedDate === d.iso ? styles.dateTabActive : ""}`} onClick={() => setSelectedDate(d.iso)}>
                 {d.label}
               </button>
             ))}
@@ -456,16 +511,33 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
 
         {/* Empty state */}
         {!loading && !fetchError && groups.length === 0 && (
-          <div className={styles.empty}>
-            {liveOnly ? (
-              <>
+          <>
+            {liveOnly && (
+              <div className={styles.empty}>
                 <div className={styles.emptyIcon}>📺</div>
                 <h2 className={styles.emptyTitle}>No live matches right now</h2>
                 <p className={styles.emptyText}>No games are currently in play.</p>
                 <button className={styles.emptyBtn} onClick={() => setLiveOnly(false)}>Show all matches</button>
-              </>
-            ) : (
-              <>
+              </div>
+            )}
+            
+            {!liveOnly && loadingUpcoming && (
+              <div className={styles.empty}>
+                <div className={styles.emptyIcon}>⏳</div>
+                <h2 className={styles.emptyTitle}>Loading upcoming matches…</h2>
+                <p className={styles.emptyText}>Fetching fixtures for the next 14 days.</p>
+              </div>
+            )}
+            
+            {!liveOnly && !loadingUpcoming && upcomingMatches.length > 0 && (
+              <UpcomingMatches 
+                matches={upcomingMatches}
+                totalCount={upcomingMatches.length}
+              />
+            )}
+            
+            {!liveOnly && !loadingUpcoming && upcomingMatches.length === 0 && (
+              <div className={styles.empty}>
                 <div className={styles.emptyIcon}>📅</div>
                 <h2 className={styles.emptyTitle}>No matches on {isoLabel(selectedDate)}</h2>
                 <p className={styles.emptyText}>No fixtures found for this date.</p>
@@ -479,9 +551,9 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
                     Tomorrow →
                   </button>
                 </div>
-              </>
+              </div>
             )}
-          </div>
+          </>
         )}
 
         {/* League groups */}
