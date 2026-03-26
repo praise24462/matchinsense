@@ -25,6 +25,9 @@ const FD_COMPETITIONS = [
   { code: "WC",  leagueId: 1,   name: "FIFA World Cup",    country: "World",   logo: "https://media.api-sports.io/football/leagues/1.png"   },
   { code: "EC",  leagueId: 4,   name: "Euro Championship", country: "Europe",  logo: "https://media.api-sports.io/football/leagues/4.png"   },
   
+  // ✨ NOTE: World Cup/Euro Qualifiers available via api-sports.io only
+  // football-data.org free API doesn't include qualifier competitions
+  
   // ── European Club Competitions ───────────────────────────────────────────
   { code: "CL",  leagueId: 2,   name: "Champions League",  country: "Europe",  logo: "https://media.api-sports.io/football/leagues/2.png"   },
   { code: "EL",  leagueId: 3,   name: "Europa League",     country: "Europe",  logo: "https://media.api-sports.io/football/leagues/3.png"   },
@@ -99,8 +102,13 @@ async function fetchEuropeanForDate(date: string, fdKey: string): Promise<Match[
           next: { revalidate: 300 },
         }
       ).then(async res => {
-        if (!res.ok) return [] as Match[];
+        if (!res.ok) {
+          console.warn(`[fetchEuropean] ${comp.code} returned ${res.status}`);
+          return [] as Match[];
+        }
         const data = await res.json();
+        const matchCount = data.matches?.length ?? 0;
+        console.log(`[fetchEuropean] ${comp.code}: ${matchCount} matches`);
         return (data.matches ?? []).map((m: any): Match => ({
           id: m.id,
           date: m.utcDate,
@@ -111,12 +119,84 @@ async function fetchEuropeanForDate(date: string, fdKey: string): Promise<Match[
           league: { id: comp.leagueId, name: comp.name, logo: comp.logo, country: comp.country },
           source: "euro",
         }));
-      }).catch(() => [] as Match[])
+      }).catch(e => {
+        console.error(`[fetchEuropean] ${comp.code} error:`, e.message);
+        return [] as Match[];
+      })
     )
   );
   const all: Match[] = [];
   for (const r of results) if (r.status === "fulfilled") all.push(...r.value);
   // Guard: skip any entry with a missing league (prevents downstream crashes)
+  return all.filter(m => m?.league?.id != null);
+}
+
+// ── API-Sports fetcher for qualifiers ─────────────────────────────────────────
+
+async function fetchQualifiersFromApiSports(date: string, apiKey: string): Promise<Match[]> {
+  if (!apiKey) return [];
+  
+  console.log(`[fetchQualifiers] Starting fetch for ${date}`);
+  
+  // ✨ League IDs for international qualifiers & friendlies from api-sports.io
+  const QUALIFIER_LEAGUES = [
+    // World Cup Qualifiers (regional)
+    { id: 821, name: "WC Qualifiers AFC", country: "Asia", logo: "https://media.api-sports.io/football/leagues/821.png" },
+    { id: 822, name: "WC Qualifiers CONCACAF", country: "Americas", logo: "https://media.api-sports.io/football/leagues/822.png" },
+    { id: 823, name: "WC Qualifiers CONMEBOL", country: "South America", logo: "https://media.api-sports.io/football/leagues/823.png" },
+    { id: 824, name: "WC Qualifiers CAF", country: "Africa", logo: "https://media.api-sports.io/football/leagues/824.png" },
+    { id: 825, name: "WC Qualifiers UEFA", country: "Europe", logo: "https://media.api-sports.io/football/leagues/825.png" },
+    { id: 826, name: "WC Qualifiers OFC", country: "Oceania", logo: "https://media.api-sports.io/football/leagues/826.png" },
+    { id: 827, name: "WC Playoffs", country: "World", logo: "https://media.api-sports.io/football/leagues/827.png" },
+    
+    // Euro Qualifiers
+    { id: 815, name: "Euro Qualifiers", country: "Europe", logo: "https://media.api-sports.io/football/leagues/815.png" },
+    
+    // International Friendlies
+    { id: 910, name: "International Friendlies", country: "World", logo: "https://media.api-sports.io/football/leagues/910.png" },
+  ];
+
+  const results = await Promise.allSettled(
+    QUALIFIER_LEAGUES.map(league =>
+      fetch(
+        `https://v3.football.api-sports.io/fixtures?league=${league.id}&date=${date}`,
+        { headers: { "x-apisports-key": apiKey }, next: { revalidate: 300 } }
+      ).then(async res => {
+        if (!res.ok) {
+          console.warn(`[fetchQualifiers] ${league.name} (${league.id}) returned ${res.status}`);
+          return [] as Match[];
+        }
+        const data = await res.json();
+        const fixtures = data.response ?? [];
+        console.log(`[fetchQualifiers] ${league.name} (${league.id}): ${fixtures.length} matches`);
+        
+        return fixtures.map((f: any): Match => ({
+          id: f.fixture?.id,
+          date: f.fixture?.date,
+          status: (FD_STATUS_MAP[f.fixture?.status?.long] ?? "NS") as Match["status"],
+          homeTeam: {
+            id: f.teams?.home?.id || 0,
+            name: f.teams?.home?.name || "Unknown",
+            logo: f.teams?.home?.logo || "",
+          },
+          awayTeam: {
+            id: f.teams?.away?.id || 0,
+            name: f.teams?.away?.name || "Unknown",
+            logo: f.teams?.away?.logo || "",
+          },
+          score: { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
+          league: { id: league.id, name: league.name, logo: league.logo, country: league.country },
+          source: "qualifiers",
+        }));
+      }).catch(e => {
+        console.error(`[fetchQualifiers] ${league.name} error:`, e.message);
+        return [] as Match[];
+      })
+    )
+  );
+
+  const all: Match[] = [];
+  for (const r of results) if (r.status === "fulfilled") all.push(...r.value);
   return all.filter(m => m?.league?.id != null);
 }
 
@@ -137,20 +217,33 @@ export async function GET(req: NextRequest) {
   const today = localDate();
   const date = new URL(req.url).searchParams.get("date") ?? today;
   const fdKey = process.env.FOOTBALL_DATA_API_KEY ?? "";
+  const apiSportsKey = process.env.FOOTBALL_API_KEY ?? "";
+
+  console.log(`[matches] Today: ${today}, Requested: ${date}, Has FD Key: ${!!fdKey}, Has API-Sports Key: ${!!apiSportsKey}`);
 
   try {
-    // ── Fetch MAJOR global competitions ONLY ──────────────────────────────────
-    const euMatches = fdKey ? await fetchEuropeanForDate(date, fdKey) : [];
+    // ── Fetch from BOTH sources in parallel ─────────────────────────────────────
+    const [euMatches, qualifierMatches] = await Promise.all([
+      fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
+      apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
+    ]);
+
+    const allMatches = [...euMatches, ...qualifierMatches];
+    console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length})`);
 
     const payload: MatchesApiResponse = {
-      matches: sortMatches(euMatches),
+      matches: sortMatches(allMatches),
       isFallback: false,
     };
 
     return NextResponse.json(payload, {
       headers: {
-        "X-Total": String(euMatches.length),
-        "X-Source": "Major global competitions (football-data.org)",
+        "X-Date": date,
+        "X-Today": today,
+        "X-Total": String(allMatches.length),
+        "X-EU": String(euMatches.length),
+        "X-Qualifiers": String(qualifierMatches.length),
+        "X-Source": "Major competitions + Qualifier rounds (football-data.org + api-sports.io)",
         "X-Note": "African matches available at /api/matches/african",
       },
     });
