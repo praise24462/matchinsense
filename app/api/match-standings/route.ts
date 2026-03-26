@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCache, setCache } from "@/services/apiCache";
 import { getCached, setCached } from "@/services/redisCache";
+import { flock } from "@/services/requestFlocking";
 
 const AS_BASE = "https://v3.football.api-sports.io";
 const TTL_1H  = 60 * 60 * 1000;
+
+async function fetchStandingsDirect(league: string, season: string, key: string) {
+  const res = await fetch(`${AS_BASE}/standings?league=${league}&season=${season}`, {
+    headers: { "x-apisports-key": key }, cache: "no-store",
+  });
+  const data = await res.json();
+
+  // Log errors for debugging
+  if (data.errors && Object.keys(data.errors).length > 0) {
+    console.error("standings API errors:", data.errors);
+    throw new Error(JSON.stringify(data.errors));
+  }
+
+  return data.response?.[0]?.league?.standings?.[0] ?? [];
+}
 
 export async function GET(req: NextRequest) {
   const url    = new URL(req.url);
@@ -28,18 +44,12 @@ export async function GET(req: NextRequest) {
   if (!key) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
   try {
-    const res  = await fetch(`${AS_BASE}/standings?league=${league}&season=${season}`, {
-      headers: { "x-apisports-key": key }, cache: "no-store",
-    });
-    const data = await res.json();
-
-    // Log errors for debugging
-    if (data.errors && Object.keys(data.errors).length > 0) {
-      console.error("standings API errors:", data.errors);
-      return NextResponse.json({ error: data.errors }, { status: 200 });
-    }
-
-    const standings = data.response?.[0]?.league?.standings?.[0] ?? [];
+    const standings = await flock(
+      `match-standings:${league}:${season}`,
+      () => fetchStandingsDirect(league, season, key),
+      6 * 60 * 60 * 1000 // 6-hour cache for standings
+    );
+    
     setCache(cacheKey, standings, TTL_1H);
     
     // Cache to Redis

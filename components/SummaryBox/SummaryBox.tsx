@@ -51,12 +51,14 @@ export default function SummaryBox({ summary, loading, error, generatedAt, onGen
         {!summary && !loading && (
           <div className={styles.idle}>
             <div className={styles.idleIcon}><SparkleIcon /></div>
+            <p className={styles.idleTitle}>Match Report</p>
             <p className={styles.idleText}>
               Get an AI-powered match narrative — goals, tactics, and a full breakdown in seconds.
             </p>
-            <Button variant="primary" size="lg" fullWidth onClick={onGenerate} iconRight={<BoltIcon />}>
+            <button className={styles.generateBtn} onClick={onGenerate}>
+              <BoltIcon />
               Generate AI Report
-            </Button>
+            </button>
           </div>
         )}
 
@@ -70,14 +72,14 @@ export default function SummaryBox({ summary, loading, error, generatedAt, onGen
         {!loading && error && (
           <div className={styles.idleErrorState}>
             <p style={{color:"var(--red)",fontSize:"13px",marginBottom:"12px"}}>⚠ {error}</p>
-            <Button variant="primary" size="lg" fullWidth onClick={onGenerate}>Try Again</Button>
+            <button className={styles.generateBtn} onClick={onGenerate}>Try Again</button>
           </div>
         )}
 
         {summary && !loading && (
           <div className={styles.summaryContent}>
-            {summary.split("\n\n").map((para, i) => (
-              <p key={i} className={styles.para}>{para}</p>
+            {summary.split("\n\n").filter(Boolean).map((para, i) => (
+              <div key={i} className={styles.paragraph}>{para}</div>
             ))}
           </div>
         )}

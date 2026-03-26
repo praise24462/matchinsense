@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { qcGet, qcSet, QC_TTL } from "@/services/quotacache";
+import { flock } from "@/services/requestFlocking";
 
 const AS_BASE = "https://v3.football.api-sports.io";
+
+async function fetchLineupsDirect(fixtureId: string, key: string) {
+  const res  = await fetch(`${AS_BASE}/fixtures/lineups?fixture=${fixtureId}`, {
+    headers: { "x-apisports-key": key }, cache: "no-store",
+  });
+  const data = await res.json();
+  return data.response ?? [];
+}
 
 export async function GET(req: NextRequest) {
   const fixtureId = new URL(req.url).searchParams.get("fixture");
@@ -16,12 +25,12 @@ export async function GET(req: NextRequest) {
   if (!key) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
   try {
-    const res  = await fetch(`${AS_BASE}/fixtures/lineups?fixture=${fixtureId}`, {
-      headers: { "x-apisports-key": key }, cache: "no-store",
-    });
-    const data = await res.json();
-    const lineups = data.response ?? [];
-    // Cache 6 hours — lineups don't change
+    const lineups = await flock(
+      `match-lineups:${fixtureId}`,
+      () => fetchLineupsDirect(fixtureId, key),
+      6 * 60 * 60 * 1000 // 6-hour cache
+    );
+
     qcSet(cacheKey, lineups, QC_TTL.LINEUPS);
     return NextResponse.json(lineups, { headers: { "X-Cache": "MISS" } });
   } catch {

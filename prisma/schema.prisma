@@ -101,6 +101,94 @@ model Summary {
   createdAt DateTime @default(now())
 }
 
+model Prediction {
+  id                    String   @id @default(cuid())
+  
+  // Match Info
+  matchId               Int
+  matchDate             DateTime
+  homeTeam              String
+  awayTeam              String
+  competition           String
+  source                String   // "euro" or "africa"
+  
+  // AI Prediction
+  predictedHome         Int?     // Predicted goal count (nullable for non-score predictions)
+  predictedAway         Int?
+  predictedOutcome      String   // "home", "draw", "away"
+  confidence            String   // "Low", "Medium", "High"
+  bestBet               String   // e.g., "Over 2.5 Goals"
+  reasoning             String   // Full reasoning text
+  
+  // Data Quality
+  dataReliability       String   // "high", "medium", "low"
+  dataIssues            String[] // Array of data quality issues
+  
+  // Weighted Metrics
+  homeWeightedForm      Int      // Percentage (0-100)
+  awayWeightedForm      Int
+  homeMomentum          String   // "improving", "declining", "stable"
+  awayMomentum          String
+  
+  // Actual Result (filled after match)
+  actualHome            Int?
+  actualAway            Int?
+  actualOutcome         String?  // "home", "draw", "away"
+  
+  // Accuracy Tracking
+  outcomeCorrect        Boolean? // Did we predict the right winner?
+  scoreCorrect          Boolean? // Did we predict exact score?
+  wasCorrect            Boolean? // General correctness (outcome or close)
+  
+  // Meta
+  predictionDate        DateTime @default(now())
+  matchCompletedAt      DateTime? // When match finished
+  
+  @@index([matchId])
+  @@index([predictionDate])
+  @@index([confidence])
+  @@index([dataReliability])
+  @@index([matchCompletedAt])
+}
+
+model PredictionStats {
+  id                    String   @id @default(cuid())
+  
+  // Time period
+  period                String   // "all-time", "7d", "30d", "this-month"
+  startDate             DateTime
+  endDate               DateTime?
+  
+  // Overall stats
+  totalPredictions      Int      @default(0)
+  correctPredictions    Int      @default(0)
+  accuracyPercent       Float    @default(0)
+  
+  // By confidence
+  highConfidenceTotal   Int      @default(0)
+  highConfidenceCorrect Int      @default(0)
+  
+  mediumConfidenceTotal Int      @default(0)
+  mediumConfidenceCorrect Int    @default(0)
+  
+  lowConfidenceTotal    Int      @default(0)
+  lowConfidenceCorrect  Int      @default(0)
+  
+  // Market analysis
+  bestBets              String[] // Most accurate markets
+  worstMarkets          String[] // Least accurate markets
+  
+  // Data quality insights
+  highDataReliabilityAccuracy    Float @default(0)
+  mediumDataReliabilityAccuracy  Float @default(0)
+  lowDataReliabilityAccuracy     Float @default(0)
+  
+  // Last updated
+  updatedAt             DateTime @default(now()) @updatedAt
+  
+  @@unique([period, startDate])
+}
+
 model VerificationToken {
   identifier String
   token      String   @unique

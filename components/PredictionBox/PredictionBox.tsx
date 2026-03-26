@@ -498,11 +498,11 @@ export default function PredictionBox({
               </div>
             )}
 
-            {/* ── Structured rows ── */}
+            {/* ── Row-based Prediction Data ── */}
             <div className={styles.rows}>
               {parsed.map(({ label, value }, i) => (
                 <div key={`${label}-${i}`} className={styles.row}>
-                  <span className={styles.rowLabel}>{label}</span>
+                  <div className={styles.rowLabel}>{label}</div>
                   <div className={styles.rowValue}>
                     {label === "CONFIDENCE"
                       ? <ConfidenceBadge level={value} />

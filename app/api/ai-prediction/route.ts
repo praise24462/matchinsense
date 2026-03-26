@@ -10,7 +10,14 @@ import {
   formatMatchStatisticsForAI,
   formatHomeAwayForAI
 } from "@/services/teamAnalytics";
+import { 
+  calculateWeightedForm,
+  detectMomentum,
+  assessPredictionQuality,
+  getQualityMessage
+} from "@/services/predictionQuality";
 import { recordPrediction, updatePredictionResult } from "@/services/predictionAccuracy";
+import { savePrediction } from "@/services/predictionTracking";
 import { getMockBettingContext, formatBettingForAI, findValueBets } from "@/services/bettingMarkets";
 import { fetchEuropeanMatchesForDate } from "@/services/europeanApi";
 import { fetchAfricanMatches } from "@/services/africanApi";
@@ -44,6 +51,7 @@ export async function POST(req: NextRequest) {
     let analyticsContext = "";
     let usedFormData = false;
     let usedH2HData = false;
+    let qualityWarning = "";
 
     if (recentMatches.length > 20) {
       try {
@@ -53,6 +61,40 @@ export async function POST(req: NextRequest) {
         if (homeForm.matches > 0 && awayForm.matches > 0) {
           analyticsContext += "\n\n" + formatFormForAI(homeForm, awayForm);
           usedFormData = true;
+
+          // ── Add weighted form (recent form matters more) ───────────────────
+          const homeWeighted = calculateWeightedForm(homeTeam, recentMatches, 10);
+          const awayWeighted = calculateWeightedForm(awayTeam, recentMatches, 10);
+          
+          analyticsContext += `\n\nWEIGHTED RECENT FORM (last 5 games weighted 2x):
+${homeTeam}: ${homeWeighted.weightedForm}% (recent form prioritized)
+${awayTeam}: ${awayWeighted.weightedForm}% (recent form prioritized)`;
+
+          // ── Add momentum detection ───────────────────────────────────────
+          const homeMomentum = detectMomentum(homeTeam, recentMatches, 10);
+          const awayMomentum = detectMomentum(awayTeam, recentMatches, 10);
+          
+          if (homeMomentum.trend !== "stable" || awayMomentum.trend !== "stable") {
+            analyticsContext += `\n\nMOMENTUM SIGNALS:
+${homeTeam}: ${homeMomentum.trend.toUpperCase()} (${homeMomentum.momentumScore > 0 ? "+" : ""}${(homeMomentum.momentumScore * 100).toFixed(0)}%)
+${awayTeam}: ${awayMomentum.trend.toUpperCase()} (${awayMomentum.momentumScore > 0 ? "+" : ""}${(awayMomentum.momentumScore * 100).toFixed(0)}%)`;
+          }
+
+          // ── Assess prediction quality ────────────────────────────────────
+          const h2h = getHeadToHead(homeTeam, awayTeam, recentMatches, 5);
+          const hasStats = homeStats && awayStats && (Object.keys(homeStats).length > 0 || Object.keys(awayStats).length > 0);
+          const quality = assessPredictionQuality(
+            homeTeam,
+            awayTeam,
+            homeForm,
+            awayForm,
+            h2h.lastMeetings.length,
+            hasStats
+          );
+          
+          if (quality.dataIssues.length > 0) {
+            qualityWarning = getQualityMessage(quality) || "";
+          }
 
           // Add advanced team metrics
           try {
@@ -125,34 +167,40 @@ ${awayTeam} away: ${awayAwayStats.away.winPercent}% (${awayAwayStats.away.wins}W
           .map((e: any) => `${e.player} ${e.minute}' (${e.team === "home" ? homeTeam : awayTeam})`).join(", ")}`
       : "";
 
-    const prompt = `You are a professional football betting analyst for MatchInsense. Provide a structured betting analysis for:
+    const dataQualityNotice = qualityWarning
+      ? `⚠️ DATA QUALITY NOTICE: ${qualityWarning}\nAdjust your confidence accordingly.`
+      : "";
+
+    const prompt = `You're a sharp football betting analyst. A mate just asked "What do you fancy for this match?" Give them your honest take based on the numbers, the form, the head-to-head.
 
 ${homeTeam} vs ${awayTeam}
 Competition: ${competition}
 ${resultContext}
 ${goalContext}
+${dataQualityNotice}
 ${analyticsContext}
 ${bettingContext}
 
 ${isUpcoming
-  ? `PRE-MATCH betting analysis. Use these exact labels:
+  ? `PRE-MATCH. Just answer like you're texting a friend who wants your best bet. Use these headers (but keep it conversational):
 
-PREDICTION: [predicted scoreline e.g. "1-2"]
-CONFIDENCE: [Low / Medium / High]
-BEST BET: [strongest single market pick e.g. "Both Teams to Score — Yes"]
-REASONING: [2-3 sentences — use form data, head-to-head, and home/away records provided above]
-ALSO CONSIDER: [Two secondary markets, one per line]
+🎯 PREDICTION: [Your final score call e.g. "1-2"]
+💪 CONFIDENCE: [Low / Medium / High] — Be honest. If the data's shaky, say Low. If it's clear, go High.
+🔥 BEST BET: [Your strongest single pick e.g. "Away win" or "Both teams to score"]
+💬 WHY: [2-3 sentences max. No jargon. Sound like you actually analyzed this.]
+🎲 ALSO CONSIDER: [Two other angles, one line each]
 
-When form data is provided, factor it heavily into your prediction. High form teams should get higher confidence.`
+Keep it real. Reference the actual form, momentum, and stats above. Skip the generic stuff. Sound like you know these teams.`
 
-  : `POST-MATCH analysis for future markets. Use these exact labels:
+  : `POST-MATCH. It's over. What just happened? What does it tell us? Use these headers:
 
-RESULT VERDICT: [e.g. "Expected win" / "Shock result" / "Fair draw"]
-FORM SIGNAL: [What this result tells us about both teams going forward]
-NEXT MATCH WATCH: [One forward-looking bet for each team's next fixture]`
+✅ WHAT HAPPENED: [Was this the expected result or a shock? Sound surprised or vindicated.]
+📊 WHAT IT MEANS: [What does this result tell us about both teams going forward? Any form signals?]
+👀 NEXT UP: [One bet to watch for each team's next match. Keep it short.]
+`
 }
 
-Be specific. Reference teams by name. Use the provided statistics and analytics. No generic statements.`;
+be specific. Name teams. Sound like you genuinely care about getting it right.`;
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -163,7 +211,7 @@ Be specific. Reference teams by name. Use the provided statistics and analytics.
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
+        temperature: 0.8,
         max_tokens: 500, // Increased for more detailed analysis
       }),
     });
@@ -189,27 +237,72 @@ Be specific. Reference teams by name. Use the provided statistics and analytics.
       const predictedOutcome = !predictedHome || !predictedAway ? "draw" :
         predictedHome > predictedAway ? "home" : predictedHome < predictedAway ? "away" : "draw";
 
-      predictionId = recordPrediction({
-        matchId: `${homeTeam}-${awayTeam}-${date}`,
-        homeTeam,
-        awayTeam,
-        predictionDate: new Date().toISOString(),
-        matchDate: date,
-        predictedHome,
-        predictedAway,
-        predictedOutcome: predictedOutcome as "home" | "draw" | "away",
-        confidence,
-        actualHome: null,
-        actualAway: null,
-        actualOutcome: null,
-        scorePredictionCorrect: null,
-        outcomeCorrect: null,
-        confidenceLevel: confidence === "High" ? 3 : confidence === "Medium" ? 2 : 1,
-        usedFormData,
-        usedH2HData,
-        usedHomeAwayData: true,
-        version: 2, // Version with enhanced data
-      });
+      const bestBetMatch = prediction.match(/BEST BET:\s*([^\n]+)/i);
+      const bestBet = bestBetMatch?.[1]?.trim() ?? "Match Result";
+
+      // Calculate data quality metrics
+      const homeForm = recentMatches.length > 20 ? calculateTeamForm(homeTeam, recentMatches, 10) : null;
+      const awayForm = recentMatches.length > 20 ? calculateTeamForm(awayTeam, recentMatches, 10) : null;
+      
+      const homeWeightedForm = homeForm ? calculateWeightedForm(homeTeam, recentMatches, 10).weightedForm : 0;
+      const awayWeightedForm = awayForm ? calculateWeightedForm(awayTeam, recentMatches, 10).weightedForm : 0;
+      
+      const homeMomentum = homeForm ? detectMomentum(homeTeam, recentMatches, 10).trend : "stable";
+      const awayMomentum = awayForm ? detectMomentum(awayTeam, recentMatches, 10).trend : "stable";
+
+      const quality = homeForm && awayForm
+        ? assessPredictionQuality(homeTeam, awayTeam, homeForm, awayForm, 0, usedStatisticsData)
+        : { dataReliability: "low", dataIssues: [] };
+
+      // Save to database with full tracking
+      try {
+        predictionId = await savePrediction({
+          matchId: parseInt(date.split("-").join("")),
+          matchDate: date,
+          homeTeam,
+          awayTeam,
+          competition,
+          source: source || "unknown",
+          predictedHome,
+          predictedAway,
+          predictedOutcome: predictedOutcome as "home" | "draw" | "away",
+          confidence,
+          bestBet,
+          reasoning: prediction
+            .match(/REASONING:\s*([^\n]+(?:\n[^\n]+)*)/i)?.[1]
+            ?.trim() ?? "Analysis provided in full prediction",
+          dataReliability: quality.dataReliability as "high" | "medium" | "low",
+          dataIssues: quality.dataIssues,
+          homeWeightedForm,
+          awayWeightedForm,
+          homeMomentum: homeMomentum as "improving" | "declining" | "stable",
+          awayMomentum: awayMomentum as "improving" | "declining" | "stable",
+        });
+      } catch (err) {
+        console.warn("[ai-prediction] Failed to save prediction to database:", err);
+        // Fall back to old recording method
+        predictionId = recordPrediction({
+          matchId: `${homeTeam}-${awayTeam}-${date}`,
+          homeTeam,
+          awayTeam,
+          predictionDate: new Date().toISOString(),
+          matchDate: date,
+          predictedHome,
+          predictedAway,
+          predictedOutcome: predictedOutcome as "home" | "draw" | "away",
+          confidence,
+          actualHome: null,
+          actualAway: null,
+          actualOutcome: null,
+          scorePredictionCorrect: null,
+          outcomeCorrect: null,
+          confidenceLevel: confidence === "High" ? 3 : confidence === "Medium" ? 2 : 1,
+          usedFormData,
+          usedH2HData,
+          usedHomeAwayData: true,
+          version: 2,
+        });
+      }
     }
 
     return NextResponse.json({ 

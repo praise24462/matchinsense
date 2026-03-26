@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { flock } from "@/services/requestFlocking";
 
 const AS_BASE = "https://v3.football.api-sports.io";
 const FD_BASE = "https://api.football-data.org/v4";
@@ -65,7 +66,7 @@ async function safeFetch(url: string, headers: Record<string, string>): Promise<
 }
 
 // ── api-football: full club data ──────────────────────────────────────────────
-async function fetchAfClubHistory(teamId: string, leagueId: string, season: string, apiKey: string) {
+async function fetchAfClubHistoryDirect(teamId: string, leagueId: string, season: string, apiKey: string) {
   console.log(`[club-history] Fetching AF data for team ${teamId}, league ${leagueId}, season ${season}`);
 
   // Fire all 4 calls in parallel — uses 4 quota but only once per 24h thanks to cache
@@ -171,6 +172,14 @@ async function fetchAfClubHistory(teamId: string, leagueId: string, season: stri
   }
 
   return { teamInfo, seasonStats, recentResults, nextFixtures, standing, fullTable, season, leagueId: Number(leagueId) };
+}
+
+async function fetchAfClubHistory(teamId: string, leagueId: string, season: string, apiKey: string) {
+  return flock(
+    `club-history:af:${teamId}:${leagueId}:${season}`,
+    () => fetchAfClubHistoryDirect(teamId, leagueId, season, apiKey),
+    24 * 60 * 60 * 1000 // 24-hour cache for club history
+  );
 }
 
 // ── football-data.org: for FD teams ──────────────────────────────────────────

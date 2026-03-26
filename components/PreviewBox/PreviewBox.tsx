@@ -22,23 +22,25 @@ function getPreviewPersonality(preview: string | null) {
   const lower = preview.toLowerCase();
   let emoji = "📺";
   let message = "";
+  let tone = "neutral";
 
-  // Detect storyline types
-  const hasContention = lower.includes("rivalry") || lower.includes("grudge") || lower.includes("feud");
+  // Detect storyline types and return appropriate tone for styling
+  const hasRivalry = lower.includes("rivalry") || lower.includes("grudge") || lower.includes("feud");
   const hasForm = lower.includes("form") || lower.includes("struggling") || lower.includes("flying");
   const hasInjury = lower.includes("injury") || lower.includes("absence") || lower.includes("missing");
   const hasUnderdog = lower.includes("underdog") || lower.includes("upset") || lower.includes("giant-killing");
   const hasClash = lower.includes("clash") || lower.includes("battle") || lower.includes("showdown");
-  const hasMuster = lower.includes("muster") || lower.includes("challenge") || lower.includes("threat");
-  const hasShift = lower.includes("shift") || lower.includes("momentum") || lower.includes("turning point");
+  const hasMomentum = lower.includes("momentum") || lower.includes("turning point") || lower.includes("shift");
 
   // Generate personality message - feel human, exciting, confident
-  if (hasContention || hasClash) {
+  if (hasRivalry || hasClash) {
     emoji = "⚡";
     message = `This is going to be spicy. All the ingredients for a memorable match are here.`;
+    tone = "rivalry";
   } else if (hasUnderdog) {
     emoji = "🎯";
     message = `This is why we love football. The underdogs are ready to make a statement.`;
+    tone = "underdog";
   } else if (hasForm) {
     emoji = "🔥";
     if (lower.includes("flying")) {
@@ -48,21 +50,22 @@ function getPreviewPersonality(preview: string | null) {
     } else {
       message = `Form is everything in this one. Watch closely.`;
     }
+    tone = "form";
   } else if (hasInjury) {
     emoji = "🏥";
     message = `Key absences will shape how this unfolds. It changes the dynamics.`;
-  } else if (hasShift || hasUnderdog) {
+    tone = "injury";
+  } else if (hasMomentum) {
     emoji = "🚀";
     message = `Something's brewing here. This could be a pivotal moment.`;
-  } else if (hasMuster) {
-    emoji = "💪";
-    message = `Both sides have what it takes. This should be competitive.`;
+    tone = "momentum";
   } else {
     emoji = "🎬";
     message = `All the storylines are set. Time to see it unfold.`;
+    tone = "clash";
   }
 
-  return { emoji, message, tone: "confident" };
+  return { emoji, message, tone };
 }
 
 // ── Round rect helper ──────────────────────────────────────────────────────────
@@ -496,24 +499,35 @@ export default function PreviewBox({
 
         {preview && !loading && (
           <>
-            {/* AI Personality Message */}
-            <div className={styles.personalityMessage}>
+            {/* AI Personality Card */}
+            <div className={`${styles.personalityCard} ${styles[`personality_${personality.tone}`]}`}>
               <span className={styles.personalityEmoji}>
                 {personality.emoji}
               </span>
               <p className={styles.personalityText}>{personality.message}</p>
             </div>
 
-            {/* Preview Content */}
-            <div className={styles.content}>
+            {/* Preview Content with Card Sections */}
+            <div className={styles.previewContent}>
               {preview
                 .split("\n\n")
                 .filter(Boolean)
                 .map((para, i) => (
-                  <p key={i} className={styles.para}>
+                  <div key={i} className={styles.paragraph}>
                     {para}
-                  </p>
+                  </div>
                 ))}
+            </div>
+
+            {/* Share Section */}
+            <div className={styles.shareSection}>
+              <button
+                className={styles.shareCta}
+                onClick={handleShare}
+                disabled={sharing}
+              >
+                {sharing ? "Creating share card…" : "📱 Share Preview"}
+              </button>
             </div>
           </>
         )}

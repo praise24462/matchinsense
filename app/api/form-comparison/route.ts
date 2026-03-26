@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCache, setCache, TTL } from "@/services/apiCache";
 import { getCached, setCached } from "@/services/redisCache";
+import { flock } from "@/services/requestFlocking";
 
 const AS_BASE = "https://v3.football.api-sports.io";
 
@@ -39,7 +40,7 @@ interface FormComparison {
   };
 }
 
-async function fetchTeamFixtures(teamId: number, limit: number = 10) {
+async function fetchTeamFixturesDirect(teamId: number, limit: number = 10) {
   const key = process.env.FOOTBALL_DATA_API_KEY ?? "";
   const res = await fetch(`${AS_BASE}/fixtures?team=${teamId}&last=${limit}&status=FT`, {
     headers: { "x-apisports-key": key },
@@ -56,6 +57,14 @@ async function fetchTeamFixtures(teamId: number, limit: number = 10) {
     homeGoals: f.goals?.home ?? 0,
     awayGoals: f.goals?.away ?? 0,
   }));
+}
+
+async function fetchTeamFixtures(teamId: number, limit: number = 10) {
+  return flock(
+    `form-comparison:${teamId}:${limit}`,
+    () => fetchTeamFixturesDirect(teamId, limit),
+    2 * 60 * 60 * 1000 // 2-hour cache for form data
+  );
 }
 
 function calculateForm(fixtures: any[], teamId: number): TeamForm {

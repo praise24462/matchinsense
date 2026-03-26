@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       ? `Result: ${homeTeam} ${score.home} – ${score.away} ${awayTeam}`
       : `Status: Match upcoming / in progress`;
 
-    const prompt = `You are a professional football analyst for PitchIntel. Write a compelling 3-paragraph match report.
+    const prompt = `You're a football writer for a top sports outlet. A fan just watched this match and wants the lowdown—what happened, who was brilliant, who flopped, why it mattered. Give them a human take, not a robot summary.
 
 ${resultLine}
 ${htScore}
@@ -41,12 +41,15 @@ ${goalLines || "  No goals recorded."}
 Match Statistics:
 ${statsText}
 
-Instructions:
-- Paragraph 1: Match narrative — how the game unfolded, key moments, goals
-- Paragraph 2: Tactical analysis — which team dominated, key stats, momentum shifts
-- Paragraph 3: Verdict — which team deserved the result, standout performances, what it means for both clubs
+Write 3 tight paragraphs:
 
-Style: Professional sports journalism. Under 250 words. No bullet points. No headers.`;
+Paragraph 1 — How It Unfolded: Tell the story. Which team started hot? When did it flip? Were there turning points? Make it vivid.
+
+Paragraph 2 — The Tactical Battle: Who won the midfield? Did the defense hold up? Were there standout performances or defensive disasters? Name players if you can.
+
+Paragraph 3 — Verdict: Who deserved the result? What does this mean for both teams? Any wild cards or surprises?
+
+Style: Like you're writing for ESPN or Sky Sports—punchy, opinionated, human. Use contractions. Sound like you cared about watching this. Under 250 words.`;
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -57,7 +60,7 @@ Style: Professional sports journalism. Under 250 words. No bullet points. No hea
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.75,
+        temperature: 0.8,
         max_tokens: 500,
       }),
     });

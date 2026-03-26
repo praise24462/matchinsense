@@ -369,6 +369,13 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
 
   // ── Derived values ────────────────────────────────────────────────────────
   let display = matches;
+  
+  // Remove live matches from past/future dates — live only appears on today
+  const today = todayIso();
+  if (selectedDate !== today) {
+    display = display.filter(m => m.status !== "LIVE" && m.status !== "HT");
+  }
+  
   if (liveOnly)   display = display.filter(m => m.status === "LIVE" || m.status === "HT");
   if (filterComp) display = display.filter(m => String(m.league.id) === filterComp);
 
@@ -391,8 +398,19 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
-  const groups    = groupByLeague(display);
+  let groups    = groupByLeague(display);
   const liveCount = matches.filter(m => m.status === "LIVE" || m.status === "HT").length;
+
+  // ── Sort groups by league importance (same priority as matches) ──────────────
+  groups = groups.sort((a, b) => {
+    const aPri = importancePriority[a.leagueId] ?? 999;
+    const bPri = importancePriority[b.leagueId] ?? 999;
+    
+    if (aPri !== bPri) return aPri - bPri; // Higher priority first
+    
+    // Secondary sort: by league name
+    return a.leagueName.localeCompare(b.leagueName);
+  });
 
   // ── Pagination ────────────────────────────────────────────────────────
   const INITIAL_GROUPS = 6;

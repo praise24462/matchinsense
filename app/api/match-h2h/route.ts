@@ -1,8 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCache, setCache, TTL } from "@/services/apiCache";
 import { getCached, setCached } from "@/services/redisCache";
+import { flock } from "@/services/requestFlocking";
 
 const AS_BASE = "https://v3.football.api-sports.io";
+
+async function fetchH2hDirect(h2h: string, key: string) {
+  const res  = await fetch(`${AS_BASE}/fixtures/headtohead?h2h=${h2h}&last=10`, {
+    headers: { "x-apisports-key": key }, cache: "no-store",
+  });
+  const data = await res.json();
+
+  if (data.errors && Object.keys(data.errors).length > 0) {
+    console.error("h2h API errors:", data.errors);
+    throw new Error(JSON.stringify(data.errors));
+  }
+
+  return (data.response ?? []).map((f: any) => ({
+    id:       f.fixture.id,
+    date:     f.fixture.date,
+    status:   f.fixture.status?.short,
+    homeTeam: { id: f.teams.home.id, name: f.teams.home.name, logo: f.teams.home.logo },
+    awayTeam: { id: f.teams.away.id, name: f.teams.away.name, logo: f.teams.away.logo },
+    score:    { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
+    league:   { name: f.league.name, logo: f.league.logo },
+  }));
+}
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -26,25 +49,12 @@ export async function GET(req: NextRequest) {
   if (!key) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
   try {
-    const res  = await fetch(`${AS_BASE}/fixtures/headtohead?h2h=${h2h}&last=10`, {
-      headers: { "x-apisports-key": key }, cache: "no-store",
-    });
-    const data = await res.json();
-
-    if (data.errors && Object.keys(data.errors).length > 0) {
-      console.error("h2h API errors:", data.errors);
-      return NextResponse.json({ error: data.errors }, { status: 200 });
-    }
-
-    const fixtures = (data.response ?? []).map((f: any) => ({
-      id:       f.fixture.id,
-      date:     f.fixture.date,
-      status:   f.fixture.status?.short,
-      homeTeam: { id: f.teams.home.id, name: f.teams.home.name, logo: f.teams.home.logo },
-      awayTeam: { id: f.teams.away.id, name: f.teams.away.name, logo: f.teams.away.logo },
-      score:    { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
-      league:   { name: f.league.name, logo: f.league.logo },
-    }));
+    const fixtures = await flock(
+      `match-h2h:${h2h}`,
+      () => fetchH2hDirect(h2h, key),
+      24 * 60 * 60 * 1000 // 24-hour cache for H2H stats
+    );
+    
     setCache(cacheKey, fixtures, TTL.PAST);
     
     // Cache to Redis
