@@ -66,8 +66,9 @@ const FD_STATUS_MAP: Record<string, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function localDate(): string {
-  // UTC time as fallback
-  return new Date().toISOString().split("T")[0];
+  // Lagos time (UTC+1) to match frontend and upcoming endpoint
+  const d = new Date(Date.now() + 60 * 60 * 1000);
+  return d.toISOString().split("T")[0];
 }
 
 function sortMatches(matches: Match[]): Match[] {
