@@ -47,7 +47,7 @@ function buildCalDays(year: number, month: number) {
 function groupByLeague(matches: Match[]) {
   const map = new Map<number, { leagueId: number; leagueName: string; leagueLogo: string; leagueCountry: string; source: string; matches: Match[] }>();
   for (const m of matches) {
-    if (!m?.league?.id) continue; // ← skip any malformed entry
+    if (m?.league?.id == null) continue; // ← skip only if league.id is null or undefined, not 0
     if (!map.has(m.league.id)) map.set(m.league.id, { leagueId: m.league.id, leagueName: m.league.name, leagueLogo: m.league.logo, leagueCountry: m.league.country, source: m.source, matches: [] });
     map.get(m.league.id)!.matches.push(m);
   }

@@ -165,17 +165,17 @@ export default function UpcomingMatches({
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.message}>
+        {/* <div className={styles.message}>
           <span className={styles.emoji}>👇</span>
           <h2 className={styles.title}>No matches today</h2>
           <p className={styles.subtitle}>Here's what's coming next</p>
-        </div>
-        {totalCount > 0 && (
+        </div> */}
+        {/* {totalCount > 0 && (
           <div className={styles.badge}>
             <span className={styles.badgeEmoji}>🔥</span>
             <span className={styles.badgeText}>{totalCount} matches upcoming</span>
           </div>
-        )}
+        )} */}
       </div>
 
       <div className={styles.groupsContainer}>

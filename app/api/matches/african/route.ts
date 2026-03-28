@@ -142,10 +142,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.API_SPORTS_KEY;
+  const apiKey = process.env.FOOTBALL_API_KEY;
   
   if (!apiKey) {
-    console.error("[African API] API_SPORTS_KEY env var is missing");
+    console.error("[African API] FOOTBALL_API_KEY env var is missing");
     return NextResponse.json(
       { 
         matches: [], 

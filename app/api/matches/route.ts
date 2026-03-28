@@ -16,6 +16,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
+import { fetchAfricanMatches } from "@/services/africanApi";
+import type { NormalizedMatch } from "@/types/matches";
 
 const FD_BASE = "https://api.football-data.org/v4";
 
@@ -70,8 +72,10 @@ const FD_STATUS_MAP: Record<string, string> = {
 
 function localDate(): string {
   // Lagos time (UTC+1) to match frontend and upcoming endpoint
-  const d = new Date(Date.now() + 60 * 60 * 1000);
-  return d.toISOString().split("T")[0];
+  // Use a Date in UTC, then add 1 hour offset for Lagos timezone
+  const utcNow = new Date();
+  const lagosTime = new Date(utcNow.getTime() + 1 * 60 * 60 * 1000);  // Add 1 hour for UTC+1
+  return lagosTime.toISOString().split("T")[0];
 }
 
 function sortMatches(matches: Match[]): Match[] {
@@ -87,6 +91,37 @@ function sortMatches(matches: Match[]): Match[] {
     if (a.status !== "FT" && b.status === "FT") return 1;
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
+}
+
+// ── Convert NormalizedMatch to Match ──────────────────────────────────────────
+
+function convertNormalizedMatch(nm: NormalizedMatch): Match {
+  return {
+    id: parseInt(nm.id.replace('af-', '')) || 0,
+    date: nm.utcDate,
+    status: nm.status === "FINISHED" ? "FT" : nm.status === "LIVE" ? "LIVE" : nm.status === "IN_PLAY" ? "LIVE" : "NS",
+    homeTeam: {
+      id: typeof nm.homeTeam.id === 'string' ? parseInt(nm.homeTeam.id) || 0 : nm.homeTeam.id,
+      name: nm.homeTeam.name,
+      logo: nm.homeTeam.crest || "",
+    },
+    awayTeam: {
+      id: typeof nm.awayTeam.id === 'string' ? parseInt(nm.awayTeam.id) || 0 : nm.awayTeam.id,
+      name: nm.awayTeam.name,
+      logo: nm.awayTeam.crest || "",
+    },
+    score: {
+      home: nm.score.fullTime.home,
+      away: nm.score.fullTime.away,
+    },
+    league: {
+      id: nm.competition.id, // Already a number from African API
+      name: nm.competition.name,
+      logo: nm.competition.emblem || "",
+      country: nm.competition.country || "",
+    },
+    source: nm.source === "african" ? "africa" : "euro",
+  };
 }
 
 // ── European fetcher (one date) ───────────────────────────────────────────────
@@ -222,14 +257,16 @@ export async function GET(req: NextRequest) {
   console.log(`[matches] Today: ${today}, Requested: ${date}, Has FD Key: ${!!fdKey}, Has API-Sports Key: ${!!apiSportsKey}`);
 
   try {
-    // ── Fetch from BOTH sources in parallel ─────────────────────────────────────
-    const [euMatches, qualifierMatches] = await Promise.all([
+    // ── Fetch from ALL sources in parallel ─────────────────────────────────────
+    const [euMatches, qualifierMatches, africanResult] = await Promise.all([
       fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
       apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
+      apiSportsKey ? fetchAfricanMatches(date) : Promise.resolve({ ok: false, reason: "african_error" }),
     ]);
 
-    const allMatches = [...euMatches, ...qualifierMatches];
-    console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length})`);
+    const africanMatches = (africanResult as any)?.ok ? (africanResult as any).matches.map(convertNormalizedMatch) : [];
+    const allMatches = [...euMatches, ...qualifierMatches, ...africanMatches];
+    console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length}, African: ${africanMatches.length})`);
 
     const payload: MatchesApiResponse = {
       matches: sortMatches(allMatches),
@@ -243,8 +280,8 @@ export async function GET(req: NextRequest) {
         "X-Total": String(allMatches.length),
         "X-EU": String(euMatches.length),
         "X-Qualifiers": String(qualifierMatches.length),
-        "X-Source": "Major competitions + Qualifier rounds (football-data.org + api-sports.io)",
-        "X-Note": "African matches available at /api/matches/african",
+        "X-African": String(africanMatches.length),
+        "X-Source": "Major competitions + Qualifiers + African leagues (football-data.org + api-sports.io)",
       },
     });
   } catch (err: any) {

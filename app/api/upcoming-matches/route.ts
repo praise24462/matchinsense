@@ -42,8 +42,10 @@ const FD_LEAGUE_MAP: Record<string, { id: number; leagueId: number; name: string
 };
 
 function localDate(): string {
-  const d = new Date(Date.now() + 60 * 60 * 1000);
-  return d.toISOString().split("T")[0];
+  // Lagos time (UTC+1) to match frontend
+  const utcNow = new Date();
+  const lagosTime = new Date(utcNow.getTime() + 1 * 60 * 60 * 1000);  // Add 1 hour for UTC+1
+  return lagosTime.toISOString().split("T")[0];
 }
 
 function addDays(iso: string, days: number): string {

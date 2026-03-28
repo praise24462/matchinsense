@@ -132,7 +132,7 @@ async function doFetchAfricanMatches(
   apiKey: string
 ): Promise<AfricanApiOutcome> {
   if (!apiKey) {
-    console.error("[africanApi] API_SPORTS_KEY env var is missing.");
+    console.error("[africanApi] FOOTBALL_API_KEY env var is missing.");
     return { ok: false, reason: "african_error" };
   }
 
@@ -257,9 +257,9 @@ async function doFetchAfricanMatches(
  * This reduces API quota usage by 80-90% in high-traffic scenarios.
  */
 export async function fetchAfricanMatches(date: string): Promise<AfricanApiOutcome> {
-  const apiKey = process.env.API_SPORTS_KEY;
+  const apiKey = process.env.FOOTBALL_API_KEY;
   if (!apiKey) {
-    console.error("[africanApi] API_SPORTS_KEY env var is missing.");
+    console.error("[africanApi] FOOTBALL_API_KEY env var is missing.");
     return { ok: false, reason: "african_error" };
   }
 
