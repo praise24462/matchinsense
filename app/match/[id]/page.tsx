@@ -374,12 +374,16 @@ function MatchDetailInner() {
             try {
               const text = await r.text();
               console.warn("[match detail] Raw error response:", text);
+              if (text) {
+                errData = { raw: text };
+              }
             } catch (textErr) {
               console.warn("[match detail] Could not read error response body");
             }
           }
           console.error("[match detail] API error:", r.status, errData);
-          throw new Error(errData?.error ?? `HTTP ${r.status}`);
+          const errorMsg = errData?.message || errData?.error || errData?.raw || `HTTP ${r.status}`;
+          throw new Error(errorMsg);
         }
         return r.json();
       })

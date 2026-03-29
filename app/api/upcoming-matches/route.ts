@@ -9,6 +9,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
+import { dbGet, dbSet } from "@/services/dbCache";
+import { flock } from "@/services/requestFlocking";
 
 const FD_BASE = "https://api.football-data.org/v4";
 
@@ -42,10 +44,24 @@ const FD_LEAGUE_MAP: Record<string, { id: number; leagueId: number; name: string
 };
 
 function localDate(): string {
-  // Lagos time (UTC+1) to match frontend
-  const utcNow = new Date();
-  const lagosTime = new Date(utcNow.getTime() + 1 * 60 * 60 * 1000);  // Add 1 hour for UTC+1
-  return lagosTime.toISOString().split("T")[0];
+  // Get today's date in Lagos timezone (UTC+1)
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  
+  // Account for Lagos timezone (UTC+1)
+  const utcHour = now.getUTCHours();
+  const lagosHour = (utcHour + 1) % 24;
+  
+  // If Lagos hour rolled to next day, add 1 day
+  if (lagosHour < utcHour) {
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(now.getUTCDate() + 1);
+    return `${tomorrow.getUTCFullYear()}-${String(tomorrow.getUTCMonth() + 1).padStart(2, "0")}-${String(tomorrow.getUTCDate()).padStart(2, "0")}`;
+  }
+  
+  return `${year}-${month}-${day}`;
 }
 
 function addDays(iso: string, days: number): string {
@@ -63,9 +79,23 @@ export async function GET(req: NextRequest) {
   try {
     const today = localDate();
     const nextWeek = addDays(today, 7);
+    const cacheKey = `upcoming-matches:${today}:${nextWeek}`;
 
-    // Fetch upcoming matches from all European competitions
-    const results = await Promise.allSettled(
+    // Try database cache first
+    try {
+      const cached = await dbGet<Match[]>(cacheKey);
+      if (cached) {
+        console.log("[upcoming-matches] Cache HIT");
+        return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+      }
+    } catch (cacheErr) {
+      console.warn("[upcoming-matches] Cache read failed:", cacheErr);
+    }
+
+    // Use request flocking to deduplicate simultaneous requests
+    const results = await flock(
+      `upcoming-matches:fetch:${today}`,
+      () => Promise.allSettled(
       FD_COMPETITIONS.map(comp =>
         fetch(
           `${FD_BASE}/competitions/${comp.code}/matches?dateFrom=${today}&dateTo=${nextWeek}&status=SCHEDULED,TIMED`,
@@ -102,6 +132,8 @@ export async function GET(req: NextRequest) {
             return [];
           })
       )
+      ),
+      300 // 5 minute flocking TTL
     );
 
     // Flatten and deduplicate
@@ -120,9 +152,20 @@ export async function GET(req: NextRequest) {
 
     // Sort by date
     all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sliced = all.slice(0, 30);
 
-    return NextResponse.json(all.slice(0, 30), {
-      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+    // Cache for 5 minutes (upcoming matches may change frequently)
+    try {
+      await dbSet(cacheKey, sliced, 300);
+    } catch (cacheErr) {
+      console.warn("[upcoming-matches] Cache write failed:", cacheErr);
+    }
+
+    return NextResponse.json(sliced, {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "X-Cache": "MISS",
+      },
     });
   } catch (err: any) {
     console.error("[upcoming-matches] Error:", err.message);

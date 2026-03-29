@@ -19,6 +19,19 @@
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-base);
     color: var(--text);
+
+  @media (max-width: 480px) {
+    grid-template-columns: 48px 1fr 32px 24px;
+    min-height: 48px;
+    padding: 0 8px 0 0;
+    gap: 2px;
+  }
+
+  @media (max-width: 320px) {
+    grid-template-columns: 44px 1fr 28px 20px;
+    min-height: 44px;
+    padding: 0 6px 0 0;
+  }
 }
 
 .rowLive {
@@ -33,6 +46,10 @@
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+
+  @media (max-width: 480px) {
+    padding: 0 2px;
+  }
 }
 
 .time {
@@ -41,6 +58,14 @@
   font-weight: 500;
   color: var(--text-2);
   letter-spacing: 0.02em;
+
+  @media (max-width: 480px) {
+    font-size: 10px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 9px;
+  }
 }
 
 .liveBadge {
@@ -50,6 +75,16 @@
   letter-spacing: 0.1em;
   color: var(--accent);
   animation: pulse 1.5s ease infinite;
+
+  @media (max-width: 480px) {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 7px;
+    letter-spacing: 0.05em;
+  }
 }
 
 .htBadge {
@@ -58,6 +93,14 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--yellow);
+
+  @media (max-width: 480px) {
+    font-size: 8px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 7px;
+  }
 }
 
 .ftBadge {
@@ -66,6 +109,14 @@
   font-weight: 500;
   color: var(--text-3);
   letter-spacing: 0.04em;
+
+  @media (max-width: 480px) {
+    font-size: 8px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 7px;
+  }
 }
 
 .pstBadge {
@@ -73,6 +124,14 @@
   font-size: 9px;
   color: var(--text-3);
   letter-spacing: 0.04em;
+
+  @media (max-width: 480px) {
+    font-size: 8px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 7px;
+  }
 }
 
 // ── Teams ─────────────────────────────────────────────────────────────────────
@@ -82,6 +141,16 @@
   justify-content: center;
   gap: 7px;
   padding: 10px 0;
+
+  @media (max-width: 480px) {
+    gap: 5px;
+    padding: 8px 0;
+  }
+
+  @media (max-width: 320px) {
+    gap: 4px;
+    padding: 6px 0;
+  }
 }
 
 .team {
@@ -95,6 +164,16 @@
   width: 18px; height: 18px;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
+
+  @media (max-width: 480px) {
+    width: 16px;
+    height: 16px;
+  }
+
+  @media (max-width: 320px) {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .crest {
@@ -107,6 +186,14 @@
   font-weight: 700;
   color: var(--text-3);
   text-transform: uppercase;
+
+  @media (max-width: 480px) {
+    font-size: 9px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 8px;
+  }
 }
 
 .name {
@@ -118,6 +205,14 @@
   text-overflow: ellipsis;
   line-height: 1;
   transition: color var(--t-fast) var(--ease);
+
+  @media (max-width: 480px) {
+    font-size: 12px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 11px;
+  }
 }
 
 .nameWin {
@@ -138,6 +233,16 @@
   justify-content: center;
   gap: 7px;
   padding: 10px 0;
+
+  @media (max-width: 480px) {
+    gap: 5px;
+    padding: 8px 0;
+  }
+
+  @media (max-width: 320px) {
+    gap: 4px;
+    padding: 6px 0;
+  }
 }
 
 .scoreNum {
@@ -148,6 +253,16 @@
   line-height: 1;
   text-align: center;
   min-width: 14px;
+
+  @media (max-width: 480px) {
+    font-size: 12px;
+    min-width: 12px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 11px;
+    min-width: 11px;
+  }
 }
 
 .scoreDash {
@@ -169,6 +284,14 @@
   transition: opacity var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 
   &:hover { color: var(--accent); }
+
+  @media (max-width: 480px) {
+    opacity: 0.5;
+  }
+
+  @media (max-width: 320px) {
+    opacity: 0.6;
+  }
 }
 
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }

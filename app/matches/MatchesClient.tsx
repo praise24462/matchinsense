@@ -11,20 +11,37 @@ import type { MatchesApiResponse } from "@/app/api/matches/route";
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 function toLagosIso(date: Date): string {
-  // Get the current UTC time
-  const utcTime = date.getTime();
-  // Add 1 hour to convert UTC to Lagos time (UTC+1)
-  const lagosTime = new Date(utcTime + 60 * 60 * 1000);
-  // Get the ISO string and extract just the date part
-  return lagosTime.toISOString().split("T")[0];
+  // Convert to Lagos local date (UTC+1)
+  // Create a formatter that uses Africa/Lagos timezone
+  const dateStr = new Date(date.getTime() + (60 * 60 * 1000)).toISOString().split("T")[0];
+  return dateStr;
 }
+
 function todayIso() {
-  return toLagosIso(new Date());
+  // Always get today's date in Lagos timezone
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  
+  // Account for Lagos timezone (UTC+1)
+  const utcHour = now.getUTCHours();
+  const lagosHour = (utcHour + 1) % 24;
+  
+  // If Lagos hour rolled to next day, add 1 day
+  if (lagosHour < utcHour) {
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(now.getUTCDate() + 1);
+    return `${tomorrow.getUTCFullYear()}-${String(tomorrow.getUTCMonth() + 1).padStart(2, "0")}-${String(tomorrow.getUTCDate()).padStart(2, "0")}`;
+  }
+  
+  return `${year}-${month}-${day}`;
 }
+
 function offsetToIso(offset: number) {
   const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return toLagosIso(d);
+  const targetDate = new Date(d.getTime() + (offset * 24 * 60 * 60 * 1000));
+  return toLagosIso(targetDate);
 }
 function isoLabel(iso: string) {
   if (iso === todayIso())      return "Today";
@@ -34,6 +51,16 @@ function isoLabel(iso: string) {
 }
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" });
+}
+function fmtDateTimeForMatch(iso: string, today: string): string {
+  const matchDate = iso.split("T")[0];
+  if (matchDate === today) {
+    // Today's match - just show time
+    return fmtTime(iso);
+  } else {
+    // Other day - show day + time (e.g., "Tomorrow 14:30" or "Sun 30 Mar 14:30")
+    return `${isoLabel(matchDate)} ${fmtTime(iso)}`;
+  }
 }
 function buildCalDays(year: number, month: number) {
   const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
@@ -109,7 +136,7 @@ const Logo = memo(function Logo({ src, size, fallback }: { src: string; size: nu
 
 // ── MatchRow ──────────────────────────────────────────────────────────────────
 
-const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
+const MatchRow = memo(function MatchRow({ match, today }: { match: Match; today: string }) {
   const router  = useRouter();
   const isLive  = match.status === "LIVE" || match.status === "HT";
   const isFT    = match.status === "FT";
@@ -127,7 +154,7 @@ const MatchRow = memo(function MatchRow({ match }: { match: Match }) {
       <div className={styles.matchTime}>
         {isLive ? <span className={styles.liveTag}>{match.status}</span>
           : isFT  ? <span className={styles.ftTag}>FT</span>
-          : isNS  ? <span className={styles.nsTime}>{fmtTime(match.date)}</span>
+          : isNS  ? <span className={styles.nsTime}>{fmtDateTimeForMatch(match.date, today)}</span>
           : <span className={styles.otherStatus}>{match.status}</span>}
       </div>
       <div className={styles.matchTeams}>
@@ -196,7 +223,7 @@ function getMatchImportance(match: Match, leaguePriority: Record<number, number>
 
 type GroupData = { leagueId: number; leagueName: string; leagueLogo: string; leagueCountry: string; source: string; matches: Match[] };
 
-const LeagueGroup = memo(function LeagueGroup({ group }: { group: GroupData }) {
+const LeagueGroup = memo(function LeagueGroup({ group, today }: { group: GroupData; today: string }) {
   return (
     <div className={styles.leagueGroup}>
       <div className={styles.leagueHead}>
@@ -209,7 +236,7 @@ const LeagueGroup = memo(function LeagueGroup({ group }: { group: GroupData }) {
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ color: "var(--text-3)" }}><polyline points="9 18 15 12 9 6"/></svg>
       </div>
       <div className={styles.matchList}>
-        {group.matches.map(m => <MatchRow key={m.id} match={m} />)}
+        {group.matches.map(m => <MatchRow key={m.id} match={m} today={today} />)}
       </div>
     </div>
   );
@@ -315,16 +342,17 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     return () => { cancelled = true; };
   }, [selectedDate]);
 
-  // ── Fetch upcoming matches when today is empty ─────────────────────────────
+  // ── Fetch upcoming matches to supplement today if it has few matches ──────────
   useEffect(() => {
     const today = todayIso();
     
-    // Only fetch if:
-    // - We have no matches for today AND
+    // Fetch if:
+    // - Today has less than 5 matches AND
     // - We're viewing today's date AND
     // - We're not in live-only mode AND
     // - We haven't encountered an error
-    if (matches.length > 0 || selectedDate !== today || liveOnly || fetchError) {
+    const hasEnoughMatches = matches.length >= 5;
+    if (hasEnoughMatches || selectedDate !== today || liveOnly || fetchError) {
       setUpcomingMatches([]);
       setLoadingUpcoming(false);
       return;
@@ -333,8 +361,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     let cancelled = false;
     setLoadingUpcoming(true);
 
-    console.log("[MatchesClient] Fetching upcoming matches for empty today...");
-    console.log("[MatchesClient] Today:", today, "Selected:", selectedDate, "Matches:", matches.length);
+    console.log("[MatchesClient] Today has", matches.length, "matches. Fetching upcoming to supplement...");
 
     fetch(`/api/matches/upcoming`)
       .then(r => r.json())
@@ -350,9 +377,12 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
 
         const raw = (data.matches ?? []) as Match[];
         const filtered = raw.filter((m: Match) => m?.league?.id != null);
+        // Show enough upcoming matches to reach 5 total in view
+        const neededCount = Math.max(0, 5 - matches.length);
+        const upcomingToShow = filtered.slice(0, Math.max(neededCount, 10)); // At least 10 upcoming
         
-        console.log("[MatchesClient] Upcoming matches fetched:", filtered.length);
-        setUpcomingMatches(filtered.slice(0, 30)); // Limit to 30 upcoming matches
+        console.log("[MatchesClient] Fetched", filtered.length, "upcoming. Showing", upcomingToShow.length);
+        setUpcomingMatches(upcomingToShow);
         setLoadingUpcoming(false);
       })
       .catch(err => {
@@ -370,8 +400,14 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   // ── Derived values ────────────────────────────────────────────────────────
   let display = matches;
   
-  // Remove live matches from past/future dates — live only appears on today
+  // When viewing today and we have < 5 matches, append upcoming matches
   const today = todayIso();
+  if (selectedDate === today && matches.length < 5 && upcomingMatches.length > 0) {
+    display = [...matches, ...upcomingMatches];
+    console.log("[MatchesClient] Today view: combined", matches.length, "today +", upcomingMatches.length, "upcoming =", display.length, "total");
+  }
+  
+  // Remove live matches from past/future dates — live only appears on today
   if (selectedDate !== today) {
     display = display.filter(m => m.status !== "LIVE" && m.status !== "HT");
   }
@@ -429,23 +465,45 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
   const hasMoreGroups = visibleCount < groups.length;
 
   // ── Sidebar competitions ──────────────────────────────────────────────────
+  // All available competitions (European + African leagues)
+  const ALL_AVAILABLE_COMPETITIONS = [
+    // International Tournaments
+    { code: "1",   name: "FIFA World Cup",       country: "World",      logo: "https://media.api-sports.io/football/leagues/1.png" },
+    { code: "4",   name: "Euro Championship",    country: "Europe",     logo: "https://media.api-sports.io/football/leagues/4.png" },
+    // European Club Competitions
+    { code: "2",   name: "Champions League",     country: "Europe",     logo: "https://media.api-sports.io/football/leagues/2.png" },
+    { code: "3",   name: "Europa League",        country: "Europe",     logo: "https://media.api-sports.io/football/leagues/3.png" },
+    // Top 5 European Leagues
+    { code: "39",  name: "Premier League",       country: "England",    logo: "https://media.api-sports.io/football/leagues/39.png" },
+    { code: "140", name: "La Liga",              country: "Spain",      logo: "https://media.api-sports.io/football/leagues/140.png" },
+    { code: "135", name: "Serie A",              country: "Italy",      logo: "https://media.api-sports.io/football/leagues/135.png" },
+    { code: "78",  name: "Bundesliga",           country: "Germany",    logo: "https://media.api-sports.io/football/leagues/78.png" },
+    { code: "61",  name: "Ligue 1",              country: "France",     logo: "https://media.api-sports.io/football/leagues/61.png" },
+    // Secondary Leagues
+    { code: "10",  name: "Championship",         country: "England",    logo: "https://media.api-sports.io/football/leagues/10.png" },
+    { code: "94",  name: "Primeira Liga",        country: "Portugal",   logo: "https://media.api-sports.io/football/leagues/94.png" },
+    { code: "71",  name: "Brasileirão",          country: "Brazil",     logo: "https://media.api-sports.io/football/leagues/71.png" },
+    // African Leagues
+    { code: "6",   name: "Africa Cup of Nations",country: "Africa",     logo: "https://media.api-sports.io/football/leagues/6.png" },
+    { code: "20",  name: "CAF Champions League", country: "Africa",     logo: "https://media.api-sports.io/football/leagues/20.png" },
+    { code: "21",  name: "CAF Confederation Cup",country: "Africa",     logo: "https://media.api-sports.io/football/leagues/21.png" },
+    { code: "323", name: "NPFL",                 country: "Nigeria",    logo: "https://media.api-sports.io/football/leagues/323.png" },
+    { code: "169", name: "Ghana Premier League", country: "Ghana",      logo: "https://media.api-sports.io/football/leagues/169.png" },
+    { code: "288", name: "PSL",                  country: "South Africa", logo: "https://media.api-sports.io/football/leagues/288.png" },
+    { code: "233", name: "Egyptian Premier League", country: "Egypt",   logo: "https://media.api-sports.io/football/leagues/233.png" },
+    { code: "200", name: "Tunisian Ligue 1",     country: "Tunisia",    logo: "https://media.api-sports.io/football/leagues/200.png" },
+  ];
+
   const SIDEBAR_PRIORITY: Record<string, number> = {
-    "2": 1, "3": 2, "848": 3,
-    "39": 4, "140": 5, "135": 6,
-    "78": 7, "61": 8,
-    "12": 9, "20": 10, "6": 11,
-    "399": 12, "288": 13, "167": 14,
-    "13": 15, "11": 16, "71": 17, "128": 18,
+    "1": 1,   "4": 2,   "2": 3,   "3": 4,
+    "39": 5,  "140": 6, "135": 7, "78": 8,   "61": 9,
+    "10": 10, "94": 11, "71": 12,
+    "6": 13,  "20": 14, "21": 15,
+    "323": 16, "169": 17, "288": 18, "233": 19, "200": 20,
   };
 
-  // FIX 3: filter before mapping so m.league is guaranteed to exist here too
-  const allComps = Array.from(
-    new Map(
-      matches
-        .filter(m => m?.league?.id != null)
-        .map(m => [m.league.id, { code: String(m.league.id), name: m.league.name, country: m.league.country, logo: m.league.logo }])
-    ).values()
-  ).sort((a, b) => {
+  // Use all available competitions for sidebar (not just today's matches)
+  const allComps = ALL_AVAILABLE_COMPETITIONS.sort((a, b) => {
     const aPri = SIDEBAR_PRIORITY[a.code] ?? 999;
     const bPri = SIDEBAR_PRIORITY[b.code] ?? 999;
     if (aPri !== bPri) return aPri - bPri;
@@ -590,14 +648,22 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
               </div>
             )}
             
-            {!liveOnly && !loadingUpcoming && upcomingMatches.length > 0 && (
+            {!liveOnly && !loadingUpcoming && upcomingMatches.length > 0 && selectedDate !== today && (
               <UpcomingMatches 
                 matches={upcomingMatches}
                 totalCount={upcomingMatches.length}
               />
             )}
             
-            {!liveOnly && !loadingUpcoming && upcomingMatches.length === 0 && (
+            {!liveOnly && !loadingUpcoming && upcomingMatches.length === 0 && selectedDate === today && (
+              <div className={styles.empty}>
+                <div className={styles.emptyIcon}>📅</div>
+                <h2 className={styles.emptyTitle}>No matches today</h2>
+                <p className={styles.emptyText}>No fixtures found for today.</p>
+              </div>
+            )}
+
+            {!liveOnly && !loadingUpcoming && groups.length === 0 && selectedDate !== today && (
               <div className={styles.empty}>
                 <div className={styles.emptyIcon}>📅</div>
                 <h2 className={styles.emptyTitle}>No matches on {isoLabel(selectedDate)}</h2>
@@ -619,7 +685,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
 
         {/* League groups */}
         {!loading && visibleGroups.map(group => (
-          <LeagueGroup key={group.leagueId} group={group} />
+          <LeagueGroup key={group.leagueId} group={group} today={today} />
         ))}
 
         {/* Load more button - explicit pagination */}

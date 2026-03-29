@@ -4,6 +4,7 @@
  * ✨ OPTIMIZED STRATEGY (Mar 2026):
  * - PRIMARY ONLY: Major global competitions with betting/prediction interest
  * - LAZY-LOAD: African matches only on-demand via /api/matches/african
+ * - CACHING: Request flocking + DB cache to minimize API quota usage
  *
  * Competitions included (betting & prediction focus):
  * - World Cup, Euro Championship (international)
@@ -11,12 +12,17 @@
  * - Top 5 leagues: PL, La Liga, Serie A, Bundesliga, Ligue 1
  * - Secondary markets: Championship, Primeira Liga, Brasileirão
  *
- * Caching: Next.js fetch revalidation 5 minutes
+ * Caching:
+ * - Live/In-Play: 60 seconds (changes frequently)
+ * - Finished matches: 24 hours (score locked)
+ * - Upcoming: 5 minutes (teams/lineups may change)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
 import { fetchAfricanMatches } from "@/services/africanApi";
+import { dbGet, dbSet } from "@/services/dbCache";
+import { flock } from "@/services/requestFlocking";
 import type { NormalizedMatch } from "@/types/matches";
 
 const FD_BASE = "https://api.football-data.org/v4";
@@ -71,11 +77,24 @@ const FD_STATUS_MAP: Record<string, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function localDate(): string {
-  // Lagos time (UTC+1) to match frontend and upcoming endpoint
-  // Use a Date in UTC, then add 1 hour offset for Lagos timezone
-  const utcNow = new Date();
-  const lagosTime = new Date(utcNow.getTime() + 1 * 60 * 60 * 1000);  // Add 1 hour for UTC+1
-  return lagosTime.toISOString().split("T")[0];
+  // Get today's date in Lagos timezone (UTC+1)
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  
+  // Account for Lagos timezone (UTC+1)
+  const utcHour = now.getUTCHours();
+  const lagosHour = (utcHour + 1) % 24;
+  
+  // If Lagos hour rolled to next day, add 1 day
+  if (lagosHour < utcHour) {
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(now.getUTCDate() + 1);
+    return `${tomorrow.getUTCFullYear()}-${String(tomorrow.getUTCMonth() + 1).padStart(2, "0")}-${String(tomorrow.getUTCDate()).padStart(2, "0")}`;
+  }
+  
+  return `${year}-${month}-${day}`;
 }
 
 function sortMatches(matches: Match[]): Match[] {
@@ -96,8 +115,21 @@ function sortMatches(matches: Match[]): Match[] {
 // ── Convert NormalizedMatch to Match ──────────────────────────────────────────
 
 function convertNormalizedMatch(nm: NormalizedMatch): Match {
+  // Extract numeric ID from af-{id} format
+  let numericId = 0;
+  if (nm.id.startsWith('af-')) {
+    const extracted = parseInt(nm.id.substring(3)); // Remove 'af-' prefix
+    if (!isNaN(extracted) && extracted > 0) {
+      numericId = extracted;
+    }
+  }
+  
+  if (numericId === 0) {
+    console.error(`[convertNormalizedMatch] Failed to extract numeric ID from: ${nm.id}`);
+  }
+
   return {
-    id: parseInt(nm.id.replace('af-', '')) || 0,
+    id: numericId,
     date: nm.utcDate,
     status: nm.status === "FINISHED" ? "FT" : nm.status === "LIVE" ? "LIVE" : nm.status === "IN_PLAY" ? "LIVE" : "NS",
     homeTeam: {
@@ -256,31 +288,64 @@ export async function GET(req: NextRequest) {
 
   console.log(`[matches] Today: ${today}, Requested: ${date}, Has FD Key: ${!!fdKey}, Has API-Sports Key: ${!!apiSportsKey}`);
 
+  const cacheKey = `matches:${date}`;
+  
   try {
-    // ── Fetch from ALL sources in parallel ─────────────────────────────────────
-    const [euMatches, qualifierMatches, africanResult] = await Promise.all([
-      fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
-      apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
-      apiSportsKey ? fetchAfricanMatches(date) : Promise.resolve({ ok: false, reason: "african_error" }),
-    ]);
+    // Try to get from cache first
+    try {
+      const cached = await dbGet<MatchesApiResponse>(cacheKey);
+      if (cached) {
+        console.log(`[matches] Cache HIT for ${date}`);
+        return NextResponse.json(cached, {
+          headers: {
+            "X-Cache": "HIT",
+            "X-Date": date,
+            "X-Total": String(cached.matches.length),
+          },
+        });
+      }
+    } catch (cacheErr: any) {
+      console.warn(`[matches] Cache read error (continuing):`, cacheErr.message);
+    }
 
-    const africanMatches = (africanResult as any)?.ok ? (africanResult as any).matches.map(convertNormalizedMatch) : [];
-    const allMatches = [...euMatches, ...qualifierMatches, ...africanMatches];
-    console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length}, African: ${africanMatches.length})`);
+    // Not in cache, fetch with request flocking to deduplicate simultaneous requests
+    const payload = await flock(
+      `matches:fetch:${date}`,
+      async () => {
+        // ── Fetch from ALL sources in parallel ────
+        const [euMatches, qualifierMatches, africanResult] = await Promise.all([
+          fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
+          apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
+          apiSportsKey ? fetchAfricanMatches(date) : Promise.resolve({ ok: false, reason: "african_error" }),
+        ]);
 
-    const payload: MatchesApiResponse = {
-      matches: sortMatches(allMatches),
-      isFallback: false,
-    };
+        const africanMatches = (africanResult as any)?.ok ? (africanResult as any).matches.map(convertNormalizedMatch) : [];
+        const allMatches = [...euMatches, ...qualifierMatches, ...africanMatches];
+        console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length}, African: ${africanMatches.length})`);
+
+        return {
+          matches: sortMatches(allMatches),
+          isFallback: false,
+        } as MatchesApiResponse;
+      },
+      300 // 5 min TTL for simultaneous request dedup
+    );
+
+    // Cache the result with TTL based on whether it's today
+    try {
+      const isToday = date === today;
+      const ttl = isToday ? 300 : 3600; // 5 min for today, 1 hour for past/future
+      await dbSet(cacheKey, payload, ttl);
+      console.log(`[matches] Cached ${date} with TTL ${ttl}s`);
+    } catch (cacheErr: any) {
+      console.warn(`[matches] Cache write error (continuing):`, cacheErr.message);
+    }
 
     return NextResponse.json(payload, {
       headers: {
+        "X-Cache": "MISS",
         "X-Date": date,
-        "X-Today": today,
-        "X-Total": String(allMatches.length),
-        "X-EU": String(euMatches.length),
-        "X-Qualifiers": String(qualifierMatches.length),
-        "X-African": String(africanMatches.length),
+        "X-Total": String(payload.matches.length),
         "X-Source": "Major competitions + Qualifiers + African leagues (football-data.org + api-sports.io)",
       },
     });

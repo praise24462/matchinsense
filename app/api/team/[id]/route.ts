@@ -10,19 +10,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
 import { flock } from "@/services/requestFlocking";
+import { dbGet, dbSet } from "@/services/dbCache";
 
 const AS_BASE = "https://v3.football.api-sports.io";
 const FD_BASE = "https://api.football-data.org/v4";
-
-const memCache = new Map<string, { data: any; expiresAt: number }>();
-function cacheGet(key: string) {
-  const e = memCache.get(key);
-  if (!e || Date.now() > e.expiresAt) { memCache.delete(key); return null; }
-  return e.data;
-}
-function cacheSet(key: string, data: any, ttlMs: number) {
-  memCache.set(key, { data, expiresAt: Date.now() + ttlMs });
-}
+const TEAM_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 const AS_STATUS_MAP: Record<string, string> = {
   FT:"FT", AET:"FT", PEN:"FT", AWD:"FT", WO:"FT",
@@ -202,27 +194,46 @@ export async function GET(
 
   const afKey = process.env.FOOTBALL_API_KEY ?? "";
   const fdKey = process.env.FOOTBALL_DATA_API_KEY ?? "";
-  const today = utcDateOffset(0);
-  const cacheKey = `team:${id}:${type}:${source}:${today}`;
+  const now = new Date();
+  const season = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const cacheKey = `team:${source || 'auto'}:${id}:${type}:${season}`;
 
-  const cached = cacheGet(cacheKey);
-  if (cached) return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } });
+  // Check persistent DB cache first (survives server restarts)
+  try {
+    const cached = await dbGet<any>(cacheKey);
+    if (cached) {
+      console.log(`[team/${id}] Cache HIT`);
+      return NextResponse.json(cached, { headers: { "X-Cache": "DB-HIT" } });
+    }
+  } catch (cacheErr: any) {
+    console.warn(`[team/${id}] Cache read failed:`, cacheErr.message);
+  }
 
   // source=fd means this team came from football-data.org match
   // everything else (euro, africa, af, or no source) = api-football
   const useFd = source === "fd" && fdKey;
 
   try {
-    const result = useFd
-      ? await fetchFdTeam(id, type, fdKey)
-      : await flock(
-          `team:african:${id}:${type}`,
-          () => fetchAfTeam(id, type, afKey),
-          24 * 60 * 60 * 1000 // 24-hour cache for African team data
-        );
+    let result;
+    if (useFd) {
+      result = await fetchFdTeam(id, type, fdKey);
+    } else {
+      // Use flocking to reduce API quota for African teams
+      result = await flock(
+        `team:af:${id}:${type}:${season}`,
+        () => fetchAfTeam(id, type, afKey),
+        TEAM_CACHE_TTL
+      );
+    }
 
-    // Cache AF team fixtures for 24h — saves quota dramatically
-    cacheSet(cacheKey, result, 24 * 60 * 60 * 1000);
+    // Cache result in persistent DB (24h TTL)
+    try {
+      await dbSet(cacheKey, result, TEAM_CACHE_TTL);
+    } catch (cacheErr: any) {
+      console.warn(`[team/${id}] Cache write failed:`, cacheErr.message);
+      // Continue without caching - don't fail the request
+    }
+
     return NextResponse.json(result, { headers: { "X-Cache": "MISS" } });
   } catch (err: any) {
     console.error(`[team/${id}]`, err.message);

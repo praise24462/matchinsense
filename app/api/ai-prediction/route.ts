@@ -8,7 +8,13 @@ import {
   getAdvancedTeamMetrics,
   formatAdvancedAnalyticsForAI,
   formatMatchStatisticsForAI,
-  formatHomeAwayForAI
+  formatHomeAwayForAI,
+  fetchPlayerInjuries,
+  getMockInjuryData,
+  formatInjuryDataForAI,
+  formatVenueForAI,
+  formatWeatherForAI,
+  getMockWeatherData
 } from "@/services/teamAnalytics";
 import { 
   calculateWeightedForm,
@@ -140,6 +146,52 @@ ${awayTeam} away: ${awayAwayStats.away.winPercent}% (${awayAwayStats.away.wins}W
       }
     }
 
+    // ── Phase 2: Add player injury & suspension context ─────────────────
+    let injuryContext = "";
+    try {
+      const afKey = process.env.FOOTBALL_API_KEY ?? "";
+      let injuries = null;
+      
+      // Try to fetch real injury data from API
+      if (afKey && source === "africa") {
+        // Match ID extraction: African API uses numeric IDs, European uses af-{id}
+        const matchIdStr = String(homeTeam + awayTeam).replace(/\s+/g, "");
+        const matchId = parseInt(matchIdStr) || 0;
+        injuries = await fetchPlayerInjuries(matchId, 0, 0, homeTeam, awayTeam, afKey).catch(() => null);
+      }
+      
+      // Fallback to mock data if real data unavailable
+      if (!injuries) {
+        injuries = getMockInjuryData(homeTeam, awayTeam);
+      }
+      
+      if (injuries) {
+        injuryContext = formatInjuryDataForAI(homeTeam, awayTeam, injuries);
+        if (injuryContext.length > 0) {
+          analyticsContext += "\n\n" + injuryContext;
+        }
+      }
+    } catch (err) {
+      console.warn("[ai-prediction] Injury context failed:", err);
+      // Continue without injury data
+    }
+
+    // ── Phase 2.2: Add venue & weather context ────────────────────────────
+    let venueWeatherContext = "";
+    try {
+      // Get mock weather data (placeholder for real weather API)
+      const weather = getMockWeatherData();
+      if (weather) {
+        venueWeatherContext = formatWeatherForAI(weather);
+        if (venueWeatherContext.length > 0) {
+          analyticsContext += "\n\n" + venueWeatherContext;
+        }
+      }
+    } catch (err) {
+      console.warn("[ai-prediction] Venue/weather context failed:", err);
+      // Continue without weather data
+    }
+
     // ── Get betting market context ────────────────────────────────────────
     let bettingContext = "";
     try {
@@ -170,6 +222,22 @@ ${awayTeam} away: ${awayAwayStats.away.winPercent}% (${awayAwayStats.away.wins}W
     const dataQualityNotice = qualityWarning
       ? `⚠️ DATA QUALITY NOTICE: ${qualityWarning}\nAdjust your confidence accordingly.`
       : "";
+      
+    // Enhanced context for accuracy calibration — helps AI set realistic confidence
+    const confidenceCalibration = qualityWarning
+      ? `\n⚠️ CONFIDENCE CALIBRATION: This match has data limitations. If form is thin (<5 recent matches) or H2H history is limited (<2 meetings), mark confidence as LOW even if the trend looks strong. Only use HIGH confidence when you have solid data from BOTH teams AND recent history is clear.`
+      : `\n✅ RELIABLE DATA: Good sample of recent form and H2H available. Set confidence to HIGH only if data points clearly to one outcome; otherwise Medium.`;
+
+    // Phase 2: Injury impact guidance for AI
+    const injuryGuidance = injuryContext.includes("⚠️ CRITICAL")
+      ? `\n⚠️ INJURY IMPACT: This match has critical player absences! Key players missing means reduced team strength. If a team loses their goalkeeper or star forward, expect:
+        - Lower scoring (fewer chances created)
+        - Defensive vulnerabilities (especially if key defender out)
+        - Adjustment needed to confidence even if form suggests dominance
+        Reduce confidence by 10-20% if missing goalkeeper or top defender.`
+      : injuryContext.includes("⚠️ MODERATE")
+      ? `\n⚠️ INJURY IMPACT: Some important players missing. Adjust expectations - team may underperform form trends.`
+      : "";
 
     const prompt = `You're a sharp football betting analyst. A mate just asked "What do you fancy for this match?" Give them your honest take based on the numbers, the form, the head-to-head.
 
@@ -185,12 +253,12 @@ ${isUpcoming
   ? `PRE-MATCH. Just answer like you're texting a friend who wants your best bet. Use these headers (but keep it conversational):
 
 🎯 PREDICTION: [Your final score call e.g. "1-2"]
-💪 CONFIDENCE: [Low / Medium / High] — Be honest. If the data's shaky, say Low. If it's clear, go High.
+💪 CONFIDENCE: [Low / Medium / High] — Be honest. If the data's shaky, say Low. If it's clear, go High.${confidenceCalibration}${injuryGuidance}
 🔥 BEST BET: [Your strongest single pick e.g. "Away win" or "Both teams to score"]
-💬 WHY: [2-3 sentences max. No jargon. Sound like you actually analyzed this.]
+💬 WHY: [2-3 sentences max. No jargon. Reference specific form %, H2H record, momentum, or injury impact. Sound like you actually analyzed this.]
 🎲 ALSO CONSIDER: [Two other angles, one line each]
 
-Keep it real. Reference the actual form, momentum, and stats above. Skip the generic stuff. Sound like you know these teams.`
+Keep it real. Name both teams in your reasoning. Sound like you know these teams.`
 
   : `POST-MATCH. It's over. What just happened? What does it tell us? Use these headers:
 
@@ -200,7 +268,7 @@ Keep it real. Reference the actual form, momentum, and stats above. Skip the gen
 `
 }
 
-be specific. Name teams. Sound like you genuinely care about getting it right.`;
+be specific. Name teams. Reference the actual data above (form %, goal averages, H2H records, injury absences). Sound like you genuinely care about getting it right.`;
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",

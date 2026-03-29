@@ -187,17 +187,34 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
     return NextResponse.json(match, { headers: { "X-Cache": "MISS" } });
   } catch (err: any) {
+    const errorMsg = err?.message ?? "Unknown error";
+    const errorType = err?.name ?? "Unknown";
+    
     console.error(`[match/${matchId}] Error:`, {
-      message: err.message,
-      stack: err.stack,
-      name: err.name,
+      message: errorMsg,
+      stack: err?.stack ?? "No stack",
+      name: errorType,
+      err: err,
     });
-    if (err.message === "Match not found")
+    
+    if (errorMsg === "Match not found")
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
-    return NextResponse.json({ 
+    
+    // Ensure response body is always valid JSON
+    const responseBody: Record<string, any> = {
       error: "Failed to load match",
-      details: err.message,
+      message: errorMsg,
       matchId: matchId,
-    }, { status: 500 });
+      type: errorType,
+    };
+    
+    // Add more context for common errors
+    if (errorMsg.includes("API key")) {
+      responseBody.hint = "API key configuration issue on server";
+    } else if (errorMsg.includes("rate limit") || errorMsg.includes("429")) {
+      responseBody.hint = "API rate limit exceeded";
+    }
+    
+    return NextResponse.json(responseBody, { status: 500 });
   }
 }
