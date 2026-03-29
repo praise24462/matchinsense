@@ -423,14 +423,25 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
     399: 17, 288: 18, 167: 19, 13: 26, 11: 27, 71: 28,
   };
   
-  // Sort matches by importance (live first, then upcoming by league tier, then finished)
+  // Sort matches: today's matches first, then upcoming matches, with league importance within each group
   display = display.sort((a, b) => {
+    const today = todayIso();
+    const aDate = a.date.split("T")[0];
+    const bDate = b.date.split("T")[0];
+    
+    // First: separate today from upcoming
+    const aIsToday = aDate === today ? 0 : 1;
+    const bIsToday = bDate === today ? 0 : 1;
+    
+    if (aIsToday !== bIsToday) return aIsToday - bIsToday; // Today first
+    
+    // Within same day group, sort by importance (live > upcoming > finished)
     const scoreA = getMatchImportance(a, importancePriority);
     const scoreB = getMatchImportance(b, importancePriority);
     
     if (scoreB !== scoreA) return scoreB - scoreA; // Higher score first
     
-    // Secondary sort: by match date
+    // Within same importance, sort by match date/time
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
