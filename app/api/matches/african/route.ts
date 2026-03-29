@@ -90,7 +90,7 @@ async function fetchAfricanDirect(
         },
         source: "africa",
       }))
-      .sort((a, b) => {
+      .sort((a: Match, b: Match) => {
         // Live matches first
         const aLive = a.status === "LIVE" || a.status === "HT";
         const bLive = b.status === "LIVE" || b.status === "HT";
