@@ -23,7 +23,7 @@ import type { Match } from "@/types";
 import { fetchAfricanMatches } from "@/services/africanApi";
 import { dbGet, dbSet } from "@/services/dbCache";
 import { flock } from "@/services/requestFlocking";
-import type { NormalizedMatch } from "@/types/matches";
+import type { NormalizedMatch, FallbackReason } from "@/types/matches";
 
 const FD_BASE = "https://api.football-data.org/v4";
 
@@ -147,12 +147,12 @@ function convertNormalizedMatch(nm: NormalizedMatch): Match {
       away: nm.score.fullTime.away,
     },
     league: {
-      id: nm.competition.id, // Already a number from African API
+      id: typeof nm.competition.id === 'string' ? parseInt(nm.competition.id) || 0 : nm.competition.id,
       name: nm.competition.name,
       logo: nm.competition.emblem || "",
       country: nm.competition.country || "",
     },
-    source: nm.source === "african" ? "africa" : "euro",
+    source: nm.source === "african" ? "african" : "european",
   };
 }
 
@@ -184,7 +184,7 @@ async function fetchEuropeanForDate(date: string, fdKey: string): Promise<Match[
           awayTeam: { id: m.awayTeam.id, name: m.awayTeam.shortName ?? m.awayTeam.name, logo: m.awayTeam.crest ?? "" },
           score: { home: m.score?.fullTime?.home ?? null, away: m.score?.fullTime?.away ?? null },
           league: { id: comp.leagueId, name: comp.name, logo: comp.logo, country: comp.country },
-          source: "euro",
+          source: "european",
         }));
       }).catch(e => {
         console.error(`[fetchEuropean] ${comp.code} error:`, e.message);
@@ -253,7 +253,7 @@ async function fetchQualifiersFromApiSports(date: string, apiKey: string): Promi
           },
           score: { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
           league: { id: league.id, name: league.name, logo: league.logo, country: league.country },
-          source: "qualifiers",
+          source: "european",
         }));
       }).catch(e => {
         console.error(`[fetchQualifiers] ${league.name} error:`, e.message);
@@ -276,6 +276,7 @@ async function fetchQualifiersFromApiSports(date: string, apiKey: string): Promi
 export interface MatchesApiResponse {
   matches: Match[];
   isFallback: boolean;
+  fallbackReason?: FallbackReason;
 }
 
 // ── Route handler ────────────────────────────────────────────────────────────

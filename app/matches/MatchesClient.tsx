@@ -145,7 +145,7 @@ const MatchRow = memo(function MatchRow({ match, today }: { match: Match; today:
   const awayWin = isFT && (match.score.away ?? 0) > (match.score.home ?? 0);
   const matchHref = `/match/${match.id}?source=${match.source}`;
   const isFdMatch = match.id < 600000;
-  const teamSrc   = match.source === "africa" ? "africa" : isFdMatch ? "fd" : "euro";
+  const teamSrc   = match.source === "african" ? "africa" : isFdMatch ? "fd" : "euro";
 
   function handleRowClick() { router.push(matchHref); }
 

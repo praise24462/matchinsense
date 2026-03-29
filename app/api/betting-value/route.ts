@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     // Fetch recent matches for form calculation
     let recentMatches: any[] = [];
     try {
-      if (source === "africa") {
+      if (source === "african") {
         const result = await fetchAfricanMatches(date);
         if (result.ok) recentMatches = result.matches;
       } else {

@@ -111,7 +111,7 @@ async function fetchAfTeam(teamId: string, type: string, apiKey: string) {
       awayTeam: { id: f.teams.away.id, name: f.teams.away.name, logo: f.teams.away.logo ?? "" },
       score:    { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
       league:   { id: f.league.id, name: f.league.name, logo: f.league.logo ?? "", country: f.league.country ?? "" },
-      source:   "euro",
+      source:   "european",
     }));
   }
 
@@ -171,7 +171,7 @@ async function fetchFdTeam(teamId: string, type: string, apiKey: string) {
           awayTeam: { id: m.awayTeam.id, name: m.awayTeam.shortName ?? m.awayTeam.name, logo: m.awayTeam.crest ?? "" },
           score: { home: m.score?.fullTime?.home ?? null, away: m.score?.fullTime?.away ?? null },
           league: { id: league.leagueId, name: league.name, logo: league.logo, country: league.country },
-          source: "euro",
+          source: "european",
         };
       });
   }

@@ -62,7 +62,7 @@ async function fetchFromFD(matchId: string, apiKey: string): Promise<MatchDetail
     score:    { home: m.score?.fullTime?.home ?? null, away: m.score?.fullTime?.away ?? null },
     halfTimeScore: { home: m.score?.halfTime?.home ?? null, away: m.score?.halfTime?.away ?? null },
     league:   { id: league.leagueId, name: league.name, logo: "", country: league.country },
-    source: "euro", statistics: [], events: [],
+    source: "european", statistics: [], events: [],
     venue: m.venue ?? undefined, referee: m.referees?.[0]?.name ?? undefined,
   };
 }
@@ -110,7 +110,7 @@ async function fetchFromAF(matchId: string, apiKey: string): Promise<MatchDetail
     score:    { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
     halfTimeScore: { home: f.score?.halftime?.home ?? null, away: f.score?.halftime?.away ?? null },
     league:   { id: f.league.id, name: f.league.name, logo: f.league.logo ?? "", country: f.league.country ?? "" },
-    source: "euro", statistics, events,
+    source: "african", statistics, events,
     venue: f.fixture?.venue?.name ?? undefined, referee: f.fixture?.referee ?? undefined,
   };
 }

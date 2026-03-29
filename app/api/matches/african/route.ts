@@ -88,7 +88,7 @@ async function fetchAfricanDirect(
           logo: f.league.logo ?? "", 
           country: f.league.country ?? "" 
         },
-        source: "africa",
+        source: "african",
       }))
       .sort((a: Match, b: Match) => {
         // Live matches first

@@ -26,7 +26,7 @@ export interface Match {
   awayTeam: Team;
   score: Score;
   league: League;
-  source: "euro" | "africa"; // which API this match came from
+  source: "european" | "african"; // which API this match came from
 }
 
 export interface MatchStatistic {

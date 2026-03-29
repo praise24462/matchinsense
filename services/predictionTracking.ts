@@ -195,14 +195,14 @@ export async function calculateAccuracyStats(days?: number) {
     }
 
     // Overall
-    const correct = predictions.filter(p => p.outcomeCorrect).length;
+    const correct = predictions.filter((p: any) => p.outcomeCorrect).length;
     const accuracyPercent = Math.round((correct / predictions.length) * 100);
 
     // By confidence
     const byConfidence: Record<string, { total: number; correct: number; percent: number }> = {};
     for (const conf of ["High", "Medium", "Low"]) {
-      const confPreds = predictions.filter(p => p.confidence === conf);
-      const confCorrect = confPreds.filter(p => p.outcomeCorrect).length;
+      const confPreds = predictions.filter((p: any) => p.confidence === conf);
+      const confCorrect = confPreds.filter((p: any) => p.outcomeCorrect).length;
       byConfidence[conf] = {
         total: confPreds.length,
         correct: confCorrect,
@@ -213,8 +213,8 @@ export async function calculateAccuracyStats(days?: number) {
     // By data reliability
     const byDataReliability: Record<string, { total: number; correct: number; percent: number }> = {};
     for (const rel of ["high", "medium", "low"]) {
-      const relPreds = predictions.filter(p => p.dataReliability === rel);
-      const relCorrect = relPreds.filter(p => p.outcomeCorrect).length;
+      const relPreds = predictions.filter((p: any) => p.dataReliability === rel);
+      const relCorrect = relPreds.filter((p: any) => p.outcomeCorrect).length;
       byDataReliability[rel] = {
         total: relPreds.length,
         correct: relCorrect,

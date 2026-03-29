@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
                 score: { home: null, away: null },
                 halfTimeScore: { home: null, away: null },
                 league: { id: leagueInfo.id, name: leagueInfo.name, country: leagueInfo.country, logo: leagueInfo.logo },
-                source: "euro",
+                source: "european",
                 statistics: [],
                 events: [],
               };

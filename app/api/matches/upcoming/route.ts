@@ -64,7 +64,7 @@ async function fetchEuropeanUpcoming(fdKey: string): Promise<Match[]> {
             score: { home: null, away: null },
             halfTimeScore: { home: null, away: null },
             league: { id: comp.leagueId, name: comp.name, logo: comp.logo, country: comp.country },
-            source: "euro" as const,
+            source: "european" as const,
             statistics: [],
             events: [],
             venue: f.venue ?? undefined,

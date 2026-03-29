@@ -81,7 +81,7 @@ async function fetchQualifiersFromApiSports(date: string, apiKey: string): Promi
               logo: league.logo,
               country: league.country,
             },
-            source: "qualifiers",
+            source: "european",
           };
         });
       }).catch(e => {

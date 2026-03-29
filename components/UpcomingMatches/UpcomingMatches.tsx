@@ -105,7 +105,7 @@ const DateGroup = memo(function DateGroup({
   onMatchClick?: (match: Match) => void;
 }) {
   const isFdMatch = group.matches[0]?.id < 600000;
-  const teamSrc = group.matches[0]?.source === "africa" ? "africa" : isFdMatch ? "fd" : "euro";
+  const teamSrc = group.matches[0]?.source === "african" ? "africa" : isFdMatch ? "fd" : "euro";
 
   return (
     <div className={styles.dateGroup}>
