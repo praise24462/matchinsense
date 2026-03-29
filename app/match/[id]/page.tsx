@@ -337,7 +337,12 @@ function MatchDetailInner() {
   const { id }   = useParams<{ id: string }>();
   const router   = useRouter();
   const searchParams = useSearchParams();
-  const source   = searchParams.get("source") ?? "euro";
+  
+  // Auto-detect European matches (FD API) vs African (API-Sports)
+  // Football-Data match IDs are typically < 600000
+  const urlSource = searchParams.get("source");
+  const isEuropeanMatch = id && Number(id) < 600000;
+  const source = urlSource ?? (isEuropeanMatch ? "fd" : "euro");
 
   const [match, setMatch]   = useState<MatchDetails | null>(null);
   const [loadingMatch, setLM] = useState(true);
