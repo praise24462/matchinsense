@@ -342,7 +342,7 @@ function MatchDetailInner() {
   // Football-Data match IDs are typically < 600000
   const urlSource = searchParams.get("source");
   const isEuropeanMatch = id && Number(id) < 600000;
-  const source = urlSource ?? (isEuropeanMatch ? "fd" : "euro");
+  const source = urlSource ?? (isEuropeanMatch ? "european" : "african");
 
   const [match, setMatch]   = useState<MatchDetails | null>(null);
   const [loadingMatch, setLM] = useState(true);
