@@ -450,12 +450,21 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
 
   // ── Sort groups by league importance (same priority as matches) ──────────────
   groups = groups.sort((a, b) => {
+    const today = todayIso();
+    
+    // First: groups with today's matches come before groups with only upcoming matches
+    const aHasToday = a.matches.some(m => m.date.split("T")[0] === today);
+    const bHasToday = b.matches.some(m => m.date.split("T")[0] === today);
+    
+    if (aHasToday !== bHasToday) return aHasToday ? -1 : 1; // Today first
+    
+    // Secondary sort: by league priority
     const aPri = importancePriority[a.leagueId] ?? 999;
     const bPri = importancePriority[b.leagueId] ?? 999;
     
     if (aPri !== bPri) return aPri - bPri; // Higher priority first
     
-    // Secondary sort: by league name
+    // Tertiary sort: by league name
     return a.leagueName.localeCompare(b.leagueName);
   });
 
@@ -607,7 +616,7 @@ export default function MatchesClient({ initialMatches, initialError }: Props) {
             <span className={styles.countLabel}>
               {isFallback ? "Upcoming European fixtures" : isoLabel(selectedDate)}
             </span>
-            <span className={styles.countNum}>{display.length} match{display.length !== 1 ? "es" : ""}</span>
+            <span className={styles.countNum}>{matches.length} match{matches.length !== 1 ? "es" : ""}</span>
             {liveCount > 0 && <span className={styles.countLive}><span className={styles.liveDot}/>{liveCount} live</span>}
           </div>
         )}
