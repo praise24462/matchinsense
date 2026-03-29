@@ -76,7 +76,7 @@ async function fetchAfricanDirect(
     const matches: Match[] = (data.response ?? [])
       .filter((f: any) => AFRICAN_COUNTRIES.has(f.league?.country ?? ""))
       .map((f: any): Match => ({
-        id: `af-${f.fixture.id}`,
+        id: f.fixture.id,
         date: f.fixture.date,
         status: (AS_STATUS_MAP[f.fixture.status?.short ?? "NS"] ?? "NS") as Match["status"],
         homeTeam: { id: f.teams.home.id, name: f.teams.home.name, logo: f.teams.home.logo ?? "" },
