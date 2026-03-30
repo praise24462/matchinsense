@@ -45,22 +45,12 @@ const FD_LEAGUE_MAP: Record<string, { id: number; leagueId: number; name: string
 
 function localDate(): string {
   // Get today's date in Lagos timezone (UTC+1)
+  // Method: Add 1 hour to UTC time, then extract date components
   const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(now.getUTCDate()).padStart(2, "0");
-  
-  // Account for Lagos timezone (UTC+1)
-  const utcHour = now.getUTCHours();
-  const lagosHour = (utcHour + 1) % 24;
-  
-  // If Lagos hour rolled to next day, add 1 day
-  if (lagosHour < utcHour) {
-    const tomorrow = new Date(now);
-    tomorrow.setUTCDate(now.getUTCDate() + 1);
-    return `${tomorrow.getUTCFullYear()}-${String(tomorrow.getUTCMonth() + 1).padStart(2, "0")}-${String(tomorrow.getUTCDate()).padStart(2, "0")}`;
-  }
-  
+  const lagosTime = new Date(now.getTime() + 60 * 60 * 1000); // Add 1 hour for Lagos timezone
+  const year = lagosTime.getUTCFullYear();
+  const month = String(lagosTime.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(lagosTime.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 

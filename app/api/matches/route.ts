@@ -78,22 +78,12 @@ const FD_STATUS_MAP: Record<string, string> = {
 
 function localDate(): string {
   // Get today's date in Lagos timezone (UTC+1)
+  // Method: Add 1 hour to UTC time, then extract date components
   const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(now.getUTCDate()).padStart(2, "0");
-  
-  // Account for Lagos timezone (UTC+1)
-  const utcHour = now.getUTCHours();
-  const lagosHour = (utcHour + 1) % 24;
-  
-  // If Lagos hour rolled to next day, add 1 day
-  if (lagosHour < utcHour) {
-    const tomorrow = new Date(now);
-    tomorrow.setUTCDate(now.getUTCDate() + 1);
-    return `${tomorrow.getUTCFullYear()}-${String(tomorrow.getUTCMonth() + 1).padStart(2, "0")}-${String(tomorrow.getUTCDate()).padStart(2, "0")}`;
-  }
-  
+  const lagosTime = new Date(now.getTime() + 60 * 60 * 1000); // Add 1 hour for Lagos timezone
+  const year = lagosTime.getUTCFullYear();
+  const month = String(lagosTime.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(lagosTime.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -313,21 +303,29 @@ export async function GET(req: NextRequest) {
     const payload = await flock(
       `matches:fetch:${date}`,
       async () => {
+        console.log(`[matches] Starting fetch for ${date}...`);
+        
         // ── Fetch from ALL sources in parallel ────
-        const [euMatches, qualifierMatches, africanResult] = await Promise.all([
-          fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
-          apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
-          apiSportsKey ? fetchAfricanMatches(date) : Promise.resolve({ ok: false, reason: "african_error" }),
-        ]);
+        try {
+          const [euMatches, qualifierMatches, africanResult] = await Promise.all([
+            fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
+            apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
+            apiSportsKey ? fetchAfricanMatches(date) : Promise.resolve({ ok: false, reason: "african_error" }),
+          ]);
 
-        const africanMatches = (africanResult as any)?.ok ? (africanResult as any).matches.map(convertNormalizedMatch) : [];
-        const allMatches = [...euMatches, ...qualifierMatches, ...africanMatches];
-        console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length}, African: ${africanMatches.length})`);
+          console.log(`[matches] EU: ${euMatches.length}, API Sports Key: ${!!apiSportsKey}`);
+          const africanMatches = (africanResult as any)?.ok ? (africanResult as any).matches.map(convertNormalizedMatch) : [];
+          const allMatches = [...euMatches, ...qualifierMatches, ...africanMatches];
+          console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length}, African: ${africanMatches.length})`);
 
-        return {
-          matches: sortMatches(allMatches),
-          isFallback: false,
-        } as MatchesApiResponse;
+          return {
+            matches: sortMatches(allMatches),
+            isFallback: false,
+          } as MatchesApiResponse;
+        } catch (fetchErr: any) {
+          console.error(`[matches] Fetch error: ${fetchErr.message}`, fetchErr);
+          throw fetchErr;
+        }
       },
       300 // 5 min TTL for simultaneous request dedup
     );
