@@ -122,7 +122,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
   const afKey = process.env.FOOTBALL_API_KEY ?? "";
   const fdKey = process.env.FOOTBALL_DATA_API_KEY ?? "";
-  const isFdMatch = Number(matchId) < 600000;
+  
+  // Use source parameter from frontend if provided, otherwise auto-detect
+  const sourceParam = req.nextUrl.searchParams.get("source");
+  const isFdMatch = sourceParam === "european" ? true : sourceParam === "african" ? false : Number(matchId) < 600000;
 
   // Check if API keys are configured
   if (!afKey && !fdKey) {
@@ -147,24 +150,26 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   try {
-    let match: MatchDetails;
+    let match: MatchDetails | undefined = undefined;
     
     if (isFdMatch && fdKey) {
       try {
         match = await fetchFromFD(matchId, fdKey);
       } catch (fdErr: any) {
-        // If FD rate limits (429) or other error, fall back to AF (with flocking)
-        console.log(`[match/${matchId}] FD failed (${fdErr.message}), falling back to AF`);
-        if (!afKey) {
-          throw new Error("FD failed and no African API key available");
+        // Only fall back to AF if match truly not found (404-like), not on rate limits or temp errors
+        const errMsg = fdErr?.message ?? "";
+        if (errMsg.includes("not found") || errMsg.includes("404")) {
+          // Match doesn't exist in FD, but user said it was european, so error
+          throw new Error(`Match ${matchId} not found in European API`);
+        } else if (errMsg.includes("429") || errMsg.includes("rate")) {
+          // Rate limited - don't fall back, let client retry later
+          throw new Error("Football-Data API rate limited. Please try again in a moment.");
+        } else {
+          // Other errors - also don't fall back, report the error
+          throw new Error(`Failed to fetch from European API: ${errMsg}`);
         }
-        match = await flock(
-          `match:african:${matchId}`,
-          () => fetchFromAF(matchId, afKey),
-          ttlForStatus("NS") // Use 5 min TTL for upcoming matches
-        );
       }
-    } else {
+    } else if (!isFdMatch || !fdKey) {
       // African league match — use flocking to reduce quota usage
       if (!afKey) {
         throw new Error("African API key not configured");
@@ -174,6 +179,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         () => fetchFromAF(matchId, afKey),
         ttlForStatus("NS") // Use 5 min TTL for upcoming matches
       );
+    }
+    if (!match) {
+      throw new Error("No match data returned");
     }
 
     // Cache in DB — finished matches cached 7 days, live 60s, upcoming 1hr

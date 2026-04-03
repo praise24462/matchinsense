@@ -10,12 +10,16 @@ import {
   formatMatchStatisticsForAI,
   formatHomeAwayForAI,
   fetchPlayerInjuries,
-  getMockInjuryData,
-  formatInjuryDataForAI,
-  formatVenueForAI,
-  formatWeatherForAI,
-  getMockWeatherData
+  formatVenueForAI
 } from "@/services/teamAnalytics";
+import { 
+  getMatchWeather, 
+  formatWeatherForAI as formatWeatherForAIFromWeather 
+} from "@/services/weatherService";
+import { 
+  getTeamInjuryReport, 
+  formatInjuryReportForAI 
+} from "@/services/injuryService";
 import { 
   calculateWeightedForm,
   detectMomentum,
@@ -149,24 +153,13 @@ ${awayTeam} away: ${awayAwayStats.away.winPercent}% (${awayAwayStats.away.wins}W
     // ── Phase 2: Add player injury & suspension context ─────────────────
     let injuryContext = "";
     try {
-      const afKey = process.env.FOOTBALL_API_KEY ?? "";
-      let injuries = null;
+      // Fetch real injury data for both teams
+      const homeInjuryReport = getTeamInjuryReport(homeTeam, date);
+      const awayInjuryReport = getTeamInjuryReport(awayTeam, date);
       
-      // Try to fetch real injury data from API
-      if (afKey && source === "africa") {
-        // Match ID extraction: African API uses numeric IDs, European uses af-{id}
-        const matchIdStr = String(homeTeam + awayTeam).replace(/\s+/g, "");
-        const matchId = parseInt(matchIdStr) || 0;
-        injuries = await fetchPlayerInjuries(matchId, 0, 0, homeTeam, awayTeam, afKey).catch(() => null);
-      }
-      
-      // Fallback to mock data if real data unavailable
-      if (!injuries) {
-        injuries = getMockInjuryData(homeTeam, awayTeam);
-      }
-      
-      if (injuries) {
-        injuryContext = formatInjuryDataForAI(homeTeam, awayTeam, injuries);
+      if (homeInjuryReport.criticalAbsences.length > 0 || awayInjuryReport.criticalAbsences.length > 0 ||
+          homeInjuryReport.moderateAbsences.length > 0 || awayInjuryReport.moderateAbsences.length > 0) {
+        injuryContext = formatInjuryReportForAI(homeInjuryReport, awayInjuryReport);
         if (injuryContext.length > 0) {
           analyticsContext += "\n\n" + injuryContext;
         }
@@ -179,10 +172,10 @@ ${awayTeam} away: ${awayAwayStats.away.winPercent}% (${awayAwayStats.away.wins}W
     // ── Phase 2.2: Add venue & weather context ────────────────────────────
     let venueWeatherContext = "";
     try {
-      // Get mock weather data (placeholder for real weather API)
-      const weather = getMockWeatherData();
+      // Get real weather data from Open-Meteo (free, unlimited API)
+      const weather = await getMatchWeather(competition, date).catch(() => null);
       if (weather) {
-        venueWeatherContext = formatWeatherForAI(weather);
+        venueWeatherContext = formatWeatherForAIFromWeather(weather, competition);
         if (venueWeatherContext.length > 0) {
           analyticsContext += "\n\n" + venueWeatherContext;
         }

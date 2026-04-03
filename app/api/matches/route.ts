@@ -4,7 +4,6 @@
  * ✨ OPTIMIZED STRATEGY (Mar 2026):
  * - PRIMARY ONLY: Major global competitions with betting/prediction interest
  * - LAZY-LOAD: African matches only on-demand via /api/matches/african
- * - CACHING: Request flocking + DB cache to minimize API quota usage
  *
  * Competitions included (betting & prediction focus):
  * - World Cup, Euro Championship (international)
@@ -12,18 +11,11 @@
  * - Top 5 leagues: PL, La Liga, Serie A, Bundesliga, Ligue 1
  * - Secondary markets: Championship, Primeira Liga, Brasileirão
  *
- * Caching:
- * - Live/In-Play: 60 seconds (changes frequently)
- * - Finished matches: 24 hours (score locked)
- * - Upcoming: 5 minutes (teams/lineups may change)
+ * Caching: Next.js fetch revalidation 5 minutes
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Match } from "@/types";
-import { fetchAfricanMatches } from "@/services/africanApi";
-import { dbGet, dbSet } from "@/services/dbCache";
-import { flock } from "@/services/requestFlocking";
-import type { NormalizedMatch, FallbackReason } from "@/types/matches";
 
 const FD_BASE = "https://api.football-data.org/v4";
 
@@ -77,14 +69,9 @@ const FD_STATUS_MAP: Record<string, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function localDate(): string {
-  // Get today's date in Lagos timezone (UTC+1)
-  // Method: Add 1 hour to UTC time, then extract date components
-  const now = new Date();
-  const lagosTime = new Date(now.getTime() + 60 * 60 * 1000); // Add 1 hour for Lagos timezone
-  const year = lagosTime.getUTCFullYear();
-  const month = String(lagosTime.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(lagosTime.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  // Lagos time (UTC+1) to match frontend and upcoming endpoint
+  const d = new Date(Date.now() + 60 * 60 * 1000);
+  return d.toISOString().split("T")[0];
 }
 
 function sortMatches(matches: Match[]): Match[] {
@@ -100,50 +87,6 @@ function sortMatches(matches: Match[]): Match[] {
     if (a.status !== "FT" && b.status === "FT") return 1;
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
-}
-
-// ── Convert NormalizedMatch to Match ──────────────────────────────────────────
-
-function convertNormalizedMatch(nm: NormalizedMatch): Match {
-  // Extract numeric ID from af-{id} format
-  let numericId = 0;
-  if (nm.id.startsWith('af-')) {
-    const extracted = parseInt(nm.id.substring(3)); // Remove 'af-' prefix
-    if (!isNaN(extracted) && extracted > 0) {
-      numericId = extracted;
-    }
-  }
-  
-  if (numericId === 0) {
-    console.error(`[convertNormalizedMatch] Failed to extract numeric ID from: ${nm.id}`);
-  }
-
-  return {
-    id: numericId,
-    date: nm.utcDate,
-    status: nm.status === "FINISHED" ? "FT" : nm.status === "LIVE" ? "LIVE" : nm.status === "IN_PLAY" ? "LIVE" : "NS",
-    homeTeam: {
-      id: typeof nm.homeTeam.id === 'string' ? parseInt(nm.homeTeam.id) || 0 : nm.homeTeam.id,
-      name: nm.homeTeam.name,
-      logo: nm.homeTeam.crest || "",
-    },
-    awayTeam: {
-      id: typeof nm.awayTeam.id === 'string' ? parseInt(nm.awayTeam.id) || 0 : nm.awayTeam.id,
-      name: nm.awayTeam.name,
-      logo: nm.awayTeam.crest || "",
-    },
-    score: {
-      home: nm.score.fullTime.home,
-      away: nm.score.fullTime.away,
-    },
-    league: {
-      id: typeof nm.competition.id === 'string' ? parseInt(nm.competition.id) || 0 : nm.competition.id,
-      name: nm.competition.name,
-      logo: nm.competition.emblem || "",
-      country: nm.competition.country || "",
-    },
-    source: nm.source === "african" ? "african" : "european",
-  };
 }
 
 // ── European fetcher (one date) ───────────────────────────────────────────────
@@ -266,7 +209,7 @@ async function fetchQualifiersFromApiSports(date: string, apiKey: string): Promi
 export interface MatchesApiResponse {
   matches: Match[];
   isFallback: boolean;
-  fallbackReason?: FallbackReason;
+  fallbackReason?: string;
 }
 
 // ── Route handler ────────────────────────────────────────────────────────────
@@ -279,73 +222,30 @@ export async function GET(req: NextRequest) {
 
   console.log(`[matches] Today: ${today}, Requested: ${date}, Has FD Key: ${!!fdKey}, Has API-Sports Key: ${!!apiSportsKey}`);
 
-  const cacheKey = `matches:${date}`;
-  
   try {
-    // Try to get from cache first
-    try {
-      const cached = await dbGet<MatchesApiResponse>(cacheKey);
-      if (cached) {
-        console.log(`[matches] Cache HIT for ${date}`);
-        return NextResponse.json(cached, {
-          headers: {
-            "X-Cache": "HIT",
-            "X-Date": date,
-            "X-Total": String(cached.matches.length),
-          },
-        });
-      }
-    } catch (cacheErr: any) {
-      console.warn(`[matches] Cache read error (continuing):`, cacheErr.message);
-    }
+    // ── Fetch from BOTH sources in parallel ─────────────────────────────────────
+    const [euMatches, qualifierMatches] = await Promise.all([
+      fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
+      apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
+    ]);
 
-    // Not in cache, fetch with request flocking to deduplicate simultaneous requests
-    const payload = await flock(
-      `matches:fetch:${date}`,
-      async () => {
-        console.log(`[matches] Starting fetch for ${date}...`);
-        
-        // ── Fetch from ALL sources in parallel ────
-        try {
-          const [euMatches, qualifierMatches, africanResult] = await Promise.all([
-            fdKey ? fetchEuropeanForDate(date, fdKey) : Promise.resolve([]),
-            apiSportsKey ? fetchQualifiersFromApiSports(date, apiSportsKey) : Promise.resolve([]),
-            apiSportsKey ? fetchAfricanMatches(date) : Promise.resolve({ ok: false, reason: "african_error" }),
-          ]);
+    const allMatches = [...euMatches, ...qualifierMatches];
+    console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length})`);
 
-          console.log(`[matches] EU: ${euMatches.length}, API Sports Key: ${!!apiSportsKey}`);
-          const africanMatches = (africanResult as any)?.ok ? (africanResult as any).matches.map(convertNormalizedMatch) : [];
-          const allMatches = [...euMatches, ...qualifierMatches, ...africanMatches];
-          console.log(`[matches] Total: ${allMatches.length} matches (EU: ${euMatches.length}, Qualifiers: ${qualifierMatches.length}, African: ${africanMatches.length})`);
-
-          return {
-            matches: sortMatches(allMatches),
-            isFallback: false,
-          } as MatchesApiResponse;
-        } catch (fetchErr: any) {
-          console.error(`[matches] Fetch error: ${fetchErr.message}`, fetchErr);
-          throw fetchErr;
-        }
-      },
-      300 // 5 min TTL for simultaneous request dedup
-    );
-
-    // Cache the result with TTL based on whether it's today
-    try {
-      const isToday = date === today;
-      const ttl = isToday ? 300 : 3600; // 5 min for today, 1 hour for past/future
-      await dbSet(cacheKey, payload, ttl);
-      console.log(`[matches] Cached ${date} with TTL ${ttl}s`);
-    } catch (cacheErr: any) {
-      console.warn(`[matches] Cache write error (continuing):`, cacheErr.message);
-    }
+    const payload: MatchesApiResponse = {
+      matches: sortMatches(allMatches),
+      isFallback: false,
+    };
 
     return NextResponse.json(payload, {
       headers: {
-        "X-Cache": "MISS",
         "X-Date": date,
-        "X-Total": String(payload.matches.length),
-        "X-Source": "Major competitions + Qualifiers + African leagues (football-data.org + api-sports.io)",
+        "X-Today": today,
+        "X-Total": String(allMatches.length),
+        "X-EU": String(euMatches.length),
+        "X-Qualifiers": String(qualifierMatches.length),
+        "X-Source": "Major competitions + Qualifier rounds (football-data.org + api-sports.io)",
+        "X-Note": "African matches available at /api/matches/african",
       },
     });
   } catch (err: any) {
