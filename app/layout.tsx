@@ -2,9 +2,12 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "../styles/globals.scss";
 import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 
-// ── Replace with your real GA Measurement ID from analytics.google.com ──
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID ?? "";
+/**
+ * Google Analytics 4 Measurement ID
+ * Set via NEXT_PUBLIC_GA_ID environment variable
+ */
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -93,23 +96,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthenticatedLayout>{children}</AuthenticatedLayout>
 
-        {/* Google Analytics — only loads when GA_ID is set */}
-        {GA_ID && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-              strategy="afterInteractive"
-            />
-            <Script id="ga-init" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${GA_ID}', { page_path: window.location.pathname });
-              `}
-            </Script>
-          </>
-        )}
+        {/* Google Analytics 4 */}
+        <GoogleAnalytics />
+
+        {/* Load gtag.js script globally */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+          strategy="afterInteractive"
+        />
+
+        {/* Initialize Google Analytics */}
+        <Script id="ga-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}', { page_path: window.location.pathname });
+          `}
+        </Script>
       </body>
     </html>
   );
