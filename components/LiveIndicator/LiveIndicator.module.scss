@@ -1,0 +1,93 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+// ── States ────────────────────────────────────────────────────────────────────
+
+.live {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  .dot { background: #22c55e; }
+}
+
+.loading {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.4);
+  border: 1px solid rgba(255,255,255,0.08);
+  .dot { background: rgba(255,255,255,0.3); animation: blink 1s infinite; }
+}
+
+.offline {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.2);
+  .dot { background: #ef4444; }
+}
+
+// ── Pulse ─────────────────────────────────────────────────────────────────────
+
+.pulse {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: #22c55e;
+    animation: ring 1.8s ease-out infinite;
+  }
+}
+
+@keyframes ring {
+  0%   { transform: scale(1); opacity: 0.6; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50%     { opacity: 0.25; }
+}
+
+// ── Extras ────────────────────────────────────────────────────────────────────
+
+.time {
+  font-weight: 400;
+  font-size: 10px;
+  opacity: 0.55;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.retry {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  &:hover { color: #fca5a5; }
+}

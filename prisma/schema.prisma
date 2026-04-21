@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  savedMatches  SavedMatch[]
+  summaries     Summary[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+  user User @relation(fields: [userId], references: [id])
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Match {
+  id            Int      @id
+  date          String
+  kickoff       DateTime
+  status        String
+  minuteLive    Int?
+  homeTeamId    Int
+  homeTeamName  String
+  homeTeamLogo  String
+  awayTeamId    Int
+  awayTeamName  String
+  awayTeamLogo  String
+  scoreHome     Int?
+  scoreAway     Int?
+  htHome        Int?
+  htAway        Int?
+  leagueId      Int
+  leagueName    String
+  leagueLogo    String
+  leagueCountry String
+  season        Int
+  source        String
+  events        Json?
+  stats         Json?
+  syncedAt      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  savedBy       SavedMatch[]
+  summaries     Summary[]
+
+  @@index([date])
+  @@index([status])
+  @@index([leagueId])
+}
+
+model SavedMatch {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  match     Match    @relation(fields: [matchId], references: [id])
+  matchId   Int
+  createdAt DateTime @default(now())
+  @@unique([userId, matchId])
+}
+
+model Summary {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  match     Match    @relation(fields: [matchId], references: [id])
+  matchId   Int
+  text      String
+  type      String   @default("report")
+  createdAt DateTime @default(now())
+}
+
+model Prediction {
+  id                    String   @id @default(cuid())
+  
+  // Match Info
+  matchId               Int
+  matchDate             DateTime
+  homeTeam              String
+  awayTeam              String
+  competition           String
+  source                String   // "euro" or "africa"
+  
+  // AI Prediction
+  predictedHome         Int?     // Predicted goal count (nullable for non-score predictions)
+  predictedAway         Int?
+  predictedOutcome      String   // "home", "draw", "away"
+  confidence            String   // "Low", "Medium", "High"
+  bestBet               String   // e.g., "Over 2.5 Goals"
+  reasoning             String   // Full reasoning text
+  
+  // Data Quality
+  dataReliability       String   // "high", "medium", "low"
+  dataIssues            String[] // Array of data quality issues
+  
+  // Weighted Metrics
+  homeWeightedForm      Int      // Percentage (0-100)
+  awayWeightedForm      Int
+  homeMomentum          String   // "improving", "declining", "stable"
+  awayMomentum          String
+  
+  // Actual Result (filled after match)
+  actualHome            Int?
+  actualAway            Int?
+  actualOutcome         String?  // "home", "draw", "away"
+  
+  // Accuracy Tracking
+  outcomeCorrect        Boolean? // Did we predict the right winner?
+  scoreCorrect          Boolean? // Did we predict exact score?
+  wasCorrect            Boolean? // General correctness (outcome or close)
+  
+  // Meta
+  predictionDate        DateTime @default(now())
+  matchCompletedAt      DateTime? // When match finished
+  
+  @@index([matchId])
+  @@index([predictionDate])
+  @@index([confidence])
+  @@index([dataReliability])
+  @@index([matchCompletedAt])
+}
+
+model PredictionStats {
+  id                    String   @id @default(cuid())
+  
+  // Time period
+  period                String   // "all-time", "7d", "30d", "this-month"
+  startDate             DateTime
+  endDate               DateTime?
+  
+  // Overall stats
+  totalPredictions      Int      @default(0)
+  correctPredictions    Int      @default(0)
+  accuracyPercent       Float    @default(0)
+  
+  // By confidence
+  highConfidenceTotal   Int      @default(0)
+  highConfidenceCorrect Int      @default(0)
+  
+  mediumConfidenceTotal Int      @default(0)
+  mediumConfidenceCorrect Int    @default(0)
+  
+  lowConfidenceTotal    Int      @default(0)
+  lowConfidenceCorrect  Int      @default(0)
+  
+  // Market analysis
+  bestBets              String[] // Most accurate markets
+  worstMarkets          String[] // Least accurate markets
+  
+  // Data quality insights
+  highDataReliabilityAccuracy    Float @default(0)
+  mediumDataReliabilityAccuracy  Float @default(0)
+  lowDataReliabilityAccuracy     Float @default(0)
+  
+  // Last updated
+  updatedAt             DateTime @default(now()) @updatedAt
+  
+  @@unique([period, startDate])
+}
+
+model BlogArticle {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  content         String   // Markdown content
+  htmlContent     String?  // HTML for display
+  
+  // Match info
+  homeTeam        String
+  awayTeam        String
+  league          String
+  
+  // Metadata
+  keywords        String   // Comma-separated
+  wordCount       Int      @default(0)
+  isUpcoming      Boolean  @default(false)
+  matchDate       DateTime?
+  
+  // SEO
+  metaDescription String?
+  featured        Boolean  @default(false)
+  
+  // Tracking
+  views           Int      @default(0)
+  createdAt       DateTime @default(now())
+  publishedAt     DateTime?
+  updatedAt       DateTime @updatedAt
+  
+  @@index([slug])
+  @@index([publishedAt])
+  @@index([createdAt])
+  @@index([league])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}

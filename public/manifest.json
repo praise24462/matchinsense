@@ -1,0 +1,56 @@
+{
+  "name": "MatchInsense — Live Football Intelligence",
+  "short_name": "MatchInsense",
+  "description": "Live scores, AI-powered match insights and African football intelligence.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "scope": "/",
+  "lang": "en",
+  "orientation": "portrait-primary",
+  "categories": ["sports", "news"],
+  "icons": [
+    {
+      "src": "/matchinsense-favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/matchinsense-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Matches",
+      "short_name": "Live",
+      "url": "/?filter=live",
+      "description": "See all matches happening right now"
+    },
+    {
+      "name": "AI Reports",
+      "short_name": "AI",
+      "url": "/summaries",
+      "description": "Your saved AI match reports"
+    },
+    {
+      "name": "Upcoming",
+      "short_name": "Schedule",
+      "url": "/schedule",
+      "description": "Upcoming fixtures"
+    },
+    {
+      "name": "Favourites",
+      "short_name": "Faves",
+      "url": "/favorites",
+      "description": "Your favourite teams and leagues"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

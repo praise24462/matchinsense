@@ -1,0 +1,88 @@
+.banner {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 480px;
+  width: calc(100vw - 32px);
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) both;
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+}
+
+.icon {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  strong {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  span {
+    color: rgba(255,255,255,0.55);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.allow {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  background: #22c55e;
+  color: #000;
+  white-space: nowrap;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #16a34a; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.dismiss {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+
+  &:hover {
+    color: rgba(255,255,255,0.75);
+    border-color: rgba(255,255,255,0.3);
+  }
+}

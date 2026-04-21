@@ -1,0 +1,125 @@
+.stack {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+
+  @media (max-width: 480px) {
+    top: 8px;
+    right: 8px;
+    left: 8px;
+  }
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  pointer-events: all;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-width: 260px;
+  max-width: 340px;
+  padding: 13px 36px 17px 13px;
+  border-radius: 12px;
+
+  background: #0e1a0e;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+
+  animation: in 0.3s cubic-bezier(0.16,1,0.3,1) both;
+
+  @media (max-width: 480px) {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+  }
+}
+
+@keyframes in {
+  from { opacity: 0; transform: translateX(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.45);
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(255,255,255,0.14); color: #fff; }
+}
+
+.icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #22c55e;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.team {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.num {
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: rgba(34,197,94,0.14);
+  color: #22c55e;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: #22c55e;
+  transform-origin: left;
+  animation: shrink linear forwards;
+}
+
+@keyframes shrink {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}

@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/sync?mode=daily&secret=praise2234", "schedule": "0 5 * * *" },
+    { "path": "/api/sync?mode=daily&secret=praise2234", "schedule": "0 10 * * *" },
+    { "path": "/api/sync?mode=daily&secret=praise2234", "schedule": "0 17 * * *" }
+  ]
+}

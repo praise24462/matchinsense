@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72">
+  <!-- Square badge background -->
+  <rect x="0" y="0" width="72" height="72" rx="14" fill="#ff4b2b"/>
+  <!-- Bold M letterform -->
+  <text x="36" y="54" text-anchor="middle"
+    font-family="Impact, Arial Black, sans-serif"
+    font-size="52" font-weight="900"
+    fill="white">M</text>
+  <!-- Dot accent bottom right -->
+  <circle cx="60" cy="64" r="5" fill="white" opacity="0.9"/>
+</svg>

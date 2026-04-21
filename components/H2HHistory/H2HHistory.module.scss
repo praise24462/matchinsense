@@ -1,0 +1,188 @@
+.section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+
+  h2 {
+    margin: 0 0 20px 0;
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #1e293b;
+
+    svg {
+      opacity: 0.6;
+    }
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 16px 0 12px 0;
+    color: #334155;
+  }
+}
+
+.h2hGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.recordCard {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+
+  .recordValue {
+    font-size: 32px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1;
+  }
+
+  .recordLabel {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.h2hMatches {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  overflow: hidden;
+
+  .matchesTitle {
+    padding: 12px 16px;
+    background: #f1f5f9;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .matchesList {
+    max-height: 400px;
+    overflow-y: auto;
+
+    .matchRow {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background: #f8fafc;
+      }
+
+      .matchDate {
+        color: #64748b;
+        min-width: 90px;
+      }
+
+      .matchScore {
+        font-weight: 600;
+        min-width: 50px;
+        text-align: center;
+        color: #0f172a;
+      }
+
+      .matchTeams {
+        flex: 1;
+        color: #334155;
+        margin: 0 12px;
+      }
+    }
+  }
+}
+
+.noMatches {
+  padding: 24px 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat {
+    background: white;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+
+    .statNumber {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .statName {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+  }
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 16px;
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #e2e8f0;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  padding: 16px;
+  background: #fef2f2;
+  border: 1px solid #fdcecb;
+  border-radius: 6px;
+  color: #991b1b;
+  font-size: 14px;
+}

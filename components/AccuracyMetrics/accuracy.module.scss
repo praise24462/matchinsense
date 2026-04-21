@@ -1,0 +1,318 @@
+.dashboard {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  color: #e0e0e0;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: #fff;
+    }
+  }
+
+  .periodSelector {
+    display: flex;
+    gap: 0.5rem;
+
+    .periodBtn {
+      padding: 0.5rem 1rem;
+      border: 1px solid #00d4ff;
+      background: transparent;
+      color: #00d4ff;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 0.9rem;
+
+      &:hover {
+        background: #00d4ff;
+        color: #1a1a2e;
+      }
+
+      &.active {
+        background: #00d4ff;
+        color: #1a1a2e;
+        font-weight: bold;
+      }
+    }
+  }
+
+  .dateRange {
+    margin-bottom: 1.5rem;
+    opacity: 0.7;
+  }
+
+  .card {
+    background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+    border: 1px solid #00d4ff;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 8px 24px rgba(0, 212, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    h3 {
+      margin: 0 0 1rem 0;
+      font-size: 1.1rem;
+      color: #00d4ff;
+    }
+
+    &.accuracy-high {
+      border-color: #00ff88;
+
+      .accuracyValue {
+        color: #00ff88;
+      }
+
+      &:hover {
+        box-shadow: 0 8px 24px rgba(0, 255, 136, 0.2);
+      }
+    }
+
+    &.accuracy-medium {
+      border-color: #ffaa00;
+
+      .accuracyValue {
+        color: #ffaa00;
+      }
+
+      &:hover {
+        box-shadow: 0 8px 24px rgba(255, 170, 0, 0.2);
+      }
+    }
+
+    &.accuracy-low {
+      border-color: #ff3333;
+
+      .accuracyValue {
+        color: #ff3333;
+      }
+
+      &:hover {
+        box-shadow: 0 8px 24px rgba(255, 51, 51, 0.2);
+      }
+    }
+  }
+
+  .accuracyValue {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+
+  .accuracyDetails {
+    display: flex;
+    gap: 2rem;
+    font-size: 0.9rem;
+    opacity: 0.8;
+
+    span {
+      display: flex;
+      align-items: center;
+
+      &::before {
+        content: "•";
+        margin-right: 0.5rem;
+        font-weight: bold;
+      }
+    }
+  }
+
+  .scoreValue {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #00d4ff;
+    margin-bottom: 0.5rem;
+  }
+
+  .scorePercent {
+    font-size: 1.5rem;
+    color: #00ff88;
+  }
+
+  .section {
+    margin-bottom: 2rem;
+
+    h3 {
+      font-size: 1.2rem;
+      color: #00d4ff;
+      margin-bottom: 1rem;
+    }
+  }
+
+  .gridContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+
+  .metricBox {
+    background: #0f3460;
+    border: 1px solid #0088cc;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.3s ease;
+
+    &:hover {
+      border-color: #00d4ff;
+      box-shadow: 0 4px 12px rgba(0, 212, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .metricLabel {
+      font-size: 0.9rem;
+      color: #00d4ff;
+      margin-bottom: 0.5rem;
+      text-transform: capitalize;
+    }
+
+    .metricValue {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #00ff88;
+      margin-bottom: 0.5rem;
+    }
+
+    .metricDetail {
+      font-size: 0.8rem;
+      opacity: 0.7;
+    }
+  }
+
+  .recentTable {
+    overflow-x: auto;
+    border: 1px solid #0088cc;
+    border-radius: 8px;
+    background: #0f3460;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+
+      thead {
+        background: #16213e;
+        border-bottom: 2px solid #00d4ff;
+
+        th {
+          padding: 1rem;
+          text-align: left;
+          color: #00d4ff;
+          font-weight: bold;
+          font-size: 0.9rem;
+        }
+      }
+
+      tbody {
+        tr {
+          border-bottom: 1px solid #0a1f36;
+          transition: background 0.2s ease;
+
+          &:hover {
+            background: #1a3a52;
+          }
+
+          &.correctRow {
+            border-left: 4px solid #00ff88;
+          }
+
+          &.incorrectRow {
+            border-left: 4px solid #ff3333;
+          }
+
+          td {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+
+            &:last-child {
+              text-align: center;
+              font-weight: bold;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .loading,
+  .error,
+  .noData {
+    padding: 2rem;
+    text-align: center;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    background: #0f3460;
+    border: 1px solid #00d4ff;
+    color: #e0e0e0;
+  }
+
+  .error {
+    border-color: #ff3333;
+    color: #ff3333;
+  }
+
+  .note {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(0, 212, 255, 0.1);
+    border-left: 4px solid #00d4ff;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    opacity: 0.8;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 1rem;
+
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+
+      h2 {
+        font-size: 1.4rem;
+      }
+    }
+
+    .periodSelector {
+      width: 100%;
+      justify-content: flex-start;
+
+      .periodBtn {
+        flex: 1;
+      }
+    }
+
+    .gridContainer {
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+
+    .recentTable {
+      table {
+        thead th {
+          font-size: 0.75rem;
+          padding: 0.5rem;
+        }
+
+        tbody td {
+          font-size: 0.75rem;
+          padding: 0.5rem;
+        }
+      }
+    }
+  }
+}
