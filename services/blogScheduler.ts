@@ -35,7 +35,8 @@ async function getUpcomingMatchesForContent(): Promise<MatchData[]> {
       take: 3, // Generate 3 articles per day max
     });
 
-    return matches.map((match) => ({
+    type MatchType = typeof matches[number];
+    return matches.map((match: MatchType) => ({
       homeTeam: match.homeTeamName,
       awayTeam: match.awayTeamName,
       league: match.leagueName,
@@ -77,7 +78,8 @@ async function getRecentlyCompletedMatches(): Promise<MatchData[]> {
       take: 2, // Generate 2 analysis articles per day
     });
 
-    return matches.map((match) => ({
+    type MatchType = typeof matches[number];
+    return matches.map((match: MatchType) => ({
       homeTeam: match.homeTeamName,
       awayTeam: match.awayTeamName,
       league: match.leagueName,

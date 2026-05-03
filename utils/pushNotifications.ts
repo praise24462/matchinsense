@@ -65,7 +65,7 @@ export async function showLocalNotification(
   if (typeof window === "undefined") return;
   if (getNotificationPermission() !== "granted") return;
 
-  const opts: NotificationOptions = {
+  const opts: NotificationOptions & { vibrate?: number[] } = {
     icon: "/matchinsense-favicon.svg",
     badge: "/matchinsense-favicon.svg",
     vibrate: [200, 100, 200],

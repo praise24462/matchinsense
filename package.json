@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cross-env TURBOPACK=0 next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "prisma generate && node scripts/build-prisma.cjs && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate && node scripts/build-prisma.cjs"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",

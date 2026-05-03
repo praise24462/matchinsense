@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     template: "%s | MatchInsense",
   },
   description:
-    "Live scores, AI-powered match reports, lineups and betting predictions for Premier League, La Liga, NPFL and more." ,
+    "Live scores, AI-powered match reports, lineups and betting predictions for Premier League, La Liga, Serie A, Bundesliga and more." ,
 
   keywords: [
     "football analysis",

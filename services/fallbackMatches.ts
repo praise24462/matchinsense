@@ -96,16 +96,13 @@ function generateFallbackMatches(date: string, count: number = 8): Match[] {
       homeTeam,
       awayTeam,
       score: { home: null, away: null },
-      halfTimeScore: { home: null, away: null },
       league: { 
         id: league.id, 
         name: league.name, 
         logo: league.logo, 
         country: league.country 
       },
-      source: "fallback",
-      statistics: [],
-      events: [],
+      source: "african",
     });
   }
   
